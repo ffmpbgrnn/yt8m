@@ -33,6 +33,7 @@ class HDFS():
           data=res['input_raw'][i][0: res['num_frames'][i], :],
           dtype=np.float16)
       self.label_dict[res['video_id'][i]] = res['labels'][i]
+    return True
 
   def done(self):
     self.fout.close()
@@ -50,6 +51,7 @@ class Stats():
     ])
     self.all_videos_frames += sum(v_num_frames)
     self.all_videos_cnt += len(v_video_id)
+    return True
 
   def done(self):
     print(self.all_videos_cnt)
@@ -74,7 +76,8 @@ class Sample():
     self.feas.append(input_raw[order, ...])
     self.sampled_cnt += sample_frame
     if self.sampled_cnt > self.num_to_sample:
-      break
+      return True
+    return False
 
   def get_feas(self):
     self.feas = np.vstack(self.feas)
@@ -143,7 +146,8 @@ def main(stage, split_id=""):
       cnt = 0
       while not coord.should_stop():
         # batch_start_time = time.time()
-        task.run(sess, inputs)
+        if not task.run(sess, inputs):
+          break
         # print(v_model_input_raw.shape)
         # print(v_video_id)
         # print(v_labels_batch)
