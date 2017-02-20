@@ -213,7 +213,9 @@ def build_graph(reader,
 
     feature_dim = len(model_input_raw.get_shape()) - 1
 
-    model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
+    if model.normazlie_input:
+      print("L2 Normalizing input")
+      model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
     with tf.name_scope("model"):
       result = model.create_model(model_input,
@@ -251,7 +253,22 @@ def build_graph(reader,
 
     # Incorporate the L2 weight penalties etc.
     final_loss = regularization_penalty * reg_loss + label_loss
-    train_op = optimizer.minimize(final_loss, global_step=global_step)
+    # train_op = optimizer.minimize(final_loss, global_step=global_step)
+    params = tf.trainable_variables()
+    gradients = tf.gradients(final_loss, params)
+    global_norm = tf.global_norm(gradients)
+    if model.clip_global_norm > 0:
+      gradients, _ = tf.clip_by_global_norm(gradients, model.clip_global_norm)
+    gradients = zip(gradients, params)
+    train_op = optimizer.apply_gradients(gradients, global_step)
+
+    if model.var_moving_average_decay > 0:
+      variable_averages = tf.train.ExponentialMovingAverage(
+        FLAGS.var_moving_average_decay, global_step)
+      variables_to_average = (tf.trainable_variables() +
+                              tf.moving_average_variables())
+      variables_averages_op = variable_averages.apply(variables_to_average)
+      train_op = tf.group(train_op, variables_averages_op)
 
     tf.add_to_collection("global_step", global_step)
     tf.add_to_collection("loss", label_loss)
@@ -261,6 +278,7 @@ def build_graph(reader,
     tf.add_to_collection("num_frames", num_frames)
     tf.add_to_collection("labels", tf.cast(labels_batch, tf.float32))
     tf.add_to_collection("train_op", train_op)
+    tf.add_to_collection("global_norm", global_norm)
 
 
 def train_loop(train_dir=None,

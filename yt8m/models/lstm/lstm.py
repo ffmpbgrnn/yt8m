@@ -28,6 +28,11 @@ from .lstm_config import LSTMConfig as lstm_config
 class LSTMEncoder(models.BaseModel):
   def __init__(self):
     super(LSTMEncoder, self).__init__()
+
+    self.normazlie_input = False
+    self.clip_global_norm = 5
+    self.var_moving_average_decay = 0.999
+
     self.cell_size = lstm_config.cell_size
     # TODO
     self.phase_train = True
