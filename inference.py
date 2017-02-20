@@ -25,10 +25,10 @@ from tensorflow import flags
 from tensorflow import gfile
 from tensorflow import logging
 
-import eval_util
-import losses
-import readers
-import utils
+from yt8m.evaluation import eval_util
+from yt8m.models import losses
+from yt8m.data_io import readers
+from yt8m import utils
 
 FLAGS = flags.FLAGS
 

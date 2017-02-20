@@ -16,13 +16,14 @@
 """
 import math
 
-import models
-import video_level_models
 import tensorflow as tf
-import model_utils as utils
 
 import tensorflow.contrib.slim as slim
 from tensorflow import flags
+
+from yt8m.models import models
+from yt8m.models import model_utils as utils
+from . import video_level_models
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("iterations", 30,

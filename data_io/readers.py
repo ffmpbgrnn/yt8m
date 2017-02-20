@@ -15,7 +15,7 @@
 """Provides readers configured for different datasets."""
 
 import tensorflow as tf
-import utils
+from yt8m import utils
 
 from tensorflow import logging
 

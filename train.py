@@ -15,17 +15,18 @@
 
 import time
 
-import eval_util
-import losses
-import frame_level_models
-import video_level_models
-import readers
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from tensorflow import app
 from tensorflow import flags
 from tensorflow import gfile
 from tensorflow import logging
+
+from yt8m.evaluation import eval_util
+from yt8m.models import losses
+from yt8m.starter import frame_level_models
+from yt8m.starter import video_level_models
+from yt8m.data_io import readers
 import utils
 
 FLAGS = flags.FLAGS

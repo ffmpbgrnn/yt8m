@@ -15,12 +15,11 @@
 """Contains model definitions."""
 import math
 
-import models
-import tensorflow as tf
-import utils
-
 from tensorflow import flags
 import tensorflow.contrib.slim as slim
+import tensorflow as tf
+
+from yt8m.models import models
 
 FLAGS = flags.FLAGS
 flags.DEFINE_integer(

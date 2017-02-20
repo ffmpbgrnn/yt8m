@@ -16,14 +16,14 @@
 """
 import math
 
-import models
 import tensorflow as tf
 import model_utils as utils
 
 import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
-from lstm_config import LSTMConfig as lstm_config
+from yt8m.models import models
+from .lstm_config import LSTMConfig as lstm_config
 
 class LSTMEncoder(models.BaseModel):
   def __init__(self):

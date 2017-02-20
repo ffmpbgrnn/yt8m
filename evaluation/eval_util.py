@@ -18,8 +18,8 @@ import numpy
 
 from tensorflow.python.platform import gfile
 
-import mean_average_precision_calculator as map_calculator
-import average_precision_calculator as ap_calculator
+from . import mean_average_precision_calculator as map_calculator
+from . import average_precision_calculator as ap_calculator
 
 
 def calculate_hit_at_one(predictions, actuals):
