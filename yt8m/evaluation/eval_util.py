@@ -21,6 +21,9 @@ from tensorflow.python.platform import gfile
 from . import mean_average_precision_calculator as map_calculator
 from . import average_precision_calculator as ap_calculator
 
+def flatten(l):
+  """ Merges a list of lists into a single list. """
+  return [item for sublist in l for item in sublist]
 
 def calculate_hit_at_one(predictions, actuals):
   """Performs a local (numpy) calculation of the hit at one.
@@ -66,6 +69,25 @@ def calculate_precision_at_equal_recall_rate(predictions, actuals):
   aggregated_precision /= num_videos
   return aggregated_precision
 
+def calculate_gap(predictions, actuals, top_k=20):
+  """Performs a local (numpy) calculation of the global average precision.
+
+  Only the top_k predictions are taken for each of the videos.
+
+  Args:
+    predictions: Matrix containing the outputs of the model.
+      Dimensions are 'batch' x 'num_classes'.
+    actuals: Matrix containing the ground truth labels.
+      Dimensions are 'batch' x 'num_classes'.
+    top_k: How many predictions to use per video.
+
+  Returns:
+    float: The global average precision.
+  """
+  gap_calculator = ap_calculator.AveragePrecisionCalculator()
+  sparse_predictions, sparse_labels, num_positives = top_k_by_class(predictions, actuals, top_k)
+  gap_calculator.accumulate(flatten(sparse_predictions), flatten(sparse_labels), sum(num_positives))
+  return gap_calculator.peek_ap_at_n()
 
 def top_k_by_class(predictions, labels, k=20):
   """Extracts the top k predictions for each video, sorted by class.
@@ -158,9 +180,6 @@ class EvaluationMetrics(object):
     # Take the top 20 predictions.
     sparse_predictions, sparse_labels, num_positives = top_k_by_class(predictions, labels, self.top_k)
     self.map_calculator.accumulate(sparse_predictions, sparse_labels, num_positives)
-    def flatten(l):
-      return [item for sublist in l for item in sublist]
-
     self.global_ap_calculator.accumulate(flatten(sparse_predictions), flatten(sparse_labels), sum(num_positives))
 
     self.num_examples += batch_size
