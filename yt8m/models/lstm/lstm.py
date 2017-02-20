@@ -17,21 +17,22 @@
 import math
 
 import tensorflow as tf
-import model_utils as utils
 
 import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from yt8m.models import models
+import yt8m.models.model_utils as utils
 from .lstm_config import LSTMConfig as lstm_config
 
 class LSTMEncoder(models.BaseModel):
   def __init__(self):
+    super(LSTMEncoder, self).__init__()
     self.cell_size = lstm_config.cell_size
     # TODO
     self.phase_train = True
     self.max_steps = lstm_config.max_steps
-
+    print(self.max_steps)
 
   def create_model(self, model_input, vocab_size, num_frames, **unused_params):
     """
@@ -48,6 +49,7 @@ class LSTMEncoder(models.BaseModel):
       'batch_size' x 'num_classes'.
     """
 
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     model_input = utils.SampleRandomSequence(model_input, num_frames,
                                              self.max_steps)
 

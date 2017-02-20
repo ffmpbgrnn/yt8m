@@ -26,6 +26,7 @@ from yt8m.evaluation import eval_util
 from yt8m.models import losses
 from yt8m.starter import frame_level_models
 from yt8m.starter import video_level_models
+from yt8m.models.lstm import lstm
 from yt8m.data_io import readers
 import utils
 
@@ -377,7 +378,7 @@ def main(unused_argv):
           feature_sizes=feature_sizes)
 
     model = find_class_by_name(FLAGS.model,
-        [frame_level_models, video_level_models])()
+        [frame_level_models, video_level_models, lstm])()
     label_loss_fn = find_class_by_name(FLAGS.label_loss, [losses])()
     optimizer_class = find_class_by_name(FLAGS.optimizer, [tf.train])
     build_graph(reader=reader,
@@ -390,7 +391,7 @@ def main(unused_argv):
                 num_readers=FLAGS.num_readers,
                 batch_size=FLAGS.batch_size)
     logging.info("built graph")
-    saver = tf.train.Saver()
+    saver = tf.train.Saver(max_to_keep=1000000)
 
   train_loop(is_chief=is_chief,
              train_dir=FLAGS.train_dir,
