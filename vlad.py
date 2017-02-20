@@ -32,37 +32,50 @@ class HDFS():
           res['video_id'][i],
           data=res['input_raw'][i][0: res['num_frames'][i], :],
           dtype=np.float16)
-      self.label_dict[res['video_id'][i]] = res['labels'][i]
+      # self.label_dict[res['video_id'][i]] = res['labels'][i]
     return True
 
   def done(self):
     self.fout.close()
-    pkl.dump(self.label_dict, open("/data/uts711/linchao/yt8m_hdfs/{}/label_{}.pkl".format(
-        self.stage, self.split_id), "w"))
+    # pkl.dump(self.label_dict, open("/data/uts711/linchao/yt8m_hdfs/{}/label_{}.pkl".format(
+        # self.stage, self.split_id), "w"))
 
 class Stats():
   def __init__(self):
     self.all_videos_frames = 0
     self.all_videos_cnt = 0
+    self.label_dict = []
+    self.vid_names = []
+    self.num_frames = []
 
   def run(self, sess, inputs):
     v_video_id, v_num_frames = sess.run([
         inputs["video_id"], inputs["num_frames"]
     ])
-    self.all_videos_frames += sum(v_num_frames)
-    self.all_videos_cnt += len(v_video_id)
+    for i in xrange(v_video_id.shape[0]):
+      self.vid_names.append(v_video_id[i])
+      self.num_frames.append(v_num_frames[i])
+    # print(v_labels.shape)
+    # print(v_video_id.shape)
+    # exit(0)
+    # self.all_videos_frames += sum(v_num_frames)
+    # self.all_videos_cnt += len(v_video_id)
     return True
 
   def done(self):
     print(self.all_videos_cnt)
     print(self.all_videos_frames)
+    pkl.dump(
+        {"vid": self.vid_names, "num_frames": self.num_frames},
+        open("./vid_frame_info.pkl", "w")
+    )
 
 
 class Sample():
   def __init__(self):
-    self.num_to_sample = 256000
-    self.num_frames = 256000000
-    self.sample_ratio = 2. * self.num_to_sample / self.num_frames
+    self.num_to_sample = 1100000
+    self.num_frames = 7875625
+    self.sample_ratio = 1.0 * self.num_to_sample / self.num_frames
     print("sample ratio: {0}".format(self.sample_ratio))
     self.sampled_cnt = 0
     self.feas = []
@@ -88,7 +101,6 @@ class Sample():
 def main(stage, split_id=""):
   feature_names = "rgb"
   feature_sizes = "1024"
-  input_shuffle = True
 
   feature_names, feature_sizes = utils.GetListOfFeatureNamesAndSizes(
       feature_names, feature_sizes)
@@ -97,11 +109,12 @@ def main(stage, split_id=""):
       feature_names=feature_names,
       feature_sizes=feature_sizes,)
 
-  data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(stage)
-  # data_pattern = "/data/uts700/linchao/yt8m/data/splits/{0}/{1}/{0}*.tfrecord".format(stage, split_id)
-  # data_pattern = "/data/uts700/linchao/yt8m/data/splits/{0}/{1}/train*.tfrecord".format(stage, split_id)
-  num_readers = 8
+  # data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(stage)
+  data_pattern = "/data/uts700/linchao/yt8m/data/splits/{0}/{1}/{0}*.tfrecord".format(stage, split_id)
+  # data_pattern = "/data/uts700/linchao/yt8m/data/splits/train/5/traincc.tfrecord"#.format(stage, split_id)
+  num_readers = 3
   batch_size = 128
+  input_shuffle = False
 
   files = gfile.Glob(data_pattern)
   if not files:
@@ -114,14 +127,18 @@ def main(stage, split_id=""):
 
   # eval_data = reader.prepare_reader(filename_queue)
   if input_shuffle:
-    batch_join = tf.train.shuffle_batch_join
+    eval_data = tf.train.shuffle_batch_join(
+        eval_data,
+        batch_size=batch_size,
+        capacity=5 * batch_size,
+        min_after_dequeue = batch_size,
+        allow_smaller_final_batch=True)
   else:
-    batch_join = tf.train.batch_join
-  eval_data = batch_join(
-      eval_data,
-      batch_size=batch_size,
-      capacity=5 * batch_size,
-      allow_smaller_final_batch=True)
+    eval_data = tf.train.batch_join(
+        eval_data,
+        batch_size=batch_size,
+        capacity=5 * batch_size,
+        allow_smaller_final_batch=True)
   video_id_batch, model_input_raw, labels_batch, num_frames = eval_data
   inputs = {
       'video_id': video_id_batch,
@@ -131,6 +148,7 @@ def main(stage, split_id=""):
   }
 
   task = Stats()
+  task = HDFS(stage, split_id)
 
   with tf.Session() as sess:
     sess.run([tf.local_variables_initializer()])
@@ -145,17 +163,8 @@ def main(stage, split_id=""):
       examples_processed = 0
       cnt = 0
       while not coord.should_stop():
-        # batch_start_time = time.time()
         if not task.run(sess, inputs):
           break
-        # print(v_model_input_raw.shape)
-        # print(v_video_id)
-        # print(v_labels_batch)
-        # print(v_num_frames)
-        # exit(0)
-        # seconds_per_batch = time.time() - batch_start_time
-        # example_per_second = v_video_id.shape[0] / seconds_per_batch
-        # examples_processed += v_video_id.shape[0]
         examples_processed += batch_size
 
         cnt += 1
@@ -172,7 +181,7 @@ def main(stage, split_id=""):
   task.done()
 
 
-# main("train", sys.argv[1])
+main("train", sys.argv[1])
 # main("train")
-main("validate")
+# main("validate")
 # main("train")
