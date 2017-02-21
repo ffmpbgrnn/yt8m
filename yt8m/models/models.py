@@ -17,7 +17,7 @@
 class BaseModel(object):
   """Inherit from this class when implementing new models."""
   def __init__(self):
-    self.normazlie_input = True
+    self.normalize_input = True
     self.clip_global_norm = 0
     self.var_moving_average_decay = 0
 

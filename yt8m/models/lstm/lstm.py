@@ -23,23 +23,21 @@ import tensorflow.contrib.slim as slim
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from yt8m.models import models
 import yt8m.models.model_utils as utils
-from .lstm_config import LSTMConfig as lstm_config
 
 class LSTMEncoder(models.BaseModel):
   def __init__(self):
     super(LSTMEncoder, self).__init__()
 
-    self.normazlie_input = False
+    self.normalize_input = False
     self.clip_global_norm = 5
-    self.var_moving_average_decay = 0#0.999
+    self.var_moving_average_decay = 0.9997
 
-    self.cell_size = lstm_config.cell_size
-    # TODO
-    self.phase_train = False
-    self.max_steps = lstm_config.max_steps
+    self.cell_size = 1024
+    self.max_steps = 30
     print(self.max_steps)
 
-  def create_model(self, model_input, vocab_size, num_frames, **unused_params):
+  def create_model(self, model_input, vocab_size, num_frames,
+                   is_training=True, **unused_params):
     """
     Args:
       model_input: A 'batch_size' x 'max_frames' x 'num_features' matrix of
@@ -54,6 +52,7 @@ class LSTMEncoder(models.BaseModel):
       'batch_size' x 'num_classes'.
     """
 
+    self.phase_train = is_training
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     model_input = utils.SampleRandomSequence(model_input, num_frames,
                                              self.max_steps)
@@ -73,21 +72,6 @@ class LSTMEncoder(models.BaseModel):
       # dec_init_state = dec_cell.zero_state(runtime_batch_size, dtype=tf.float32)
       # dec_outputs, _ = tf.nn.dynamic_rnn(
           # dec_cell, self.dec_inputs, initial_state=dec_init_state, scope="dec")
-
-
-    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
-    feature_size = model_input.get_shape().as_list()[2]
-
-    denominators = tf.reshape(
-        tf.tile(num_frames, [1, feature_size]), [-1, feature_size])
-    avg_pooled = tf.reduce_sum(model_input,
-                               axis=[1]) / denominators
-
-    output = slim.fully_connected(
-        avg_pooled, vocab_size, activation_fn=tf.nn.sigmoid,
-        weights_regularizer=slim.l2_regularizer(1e-5),)
-        # weights_regularizer=slim.l2_regularizer(1e-5), scope="output0")
-    return {"predictions": output}
 
   def get_enc_cell(self, cell_size, vocab_size):
     cell = core_rnn_cell.GRUCell(cell_size)

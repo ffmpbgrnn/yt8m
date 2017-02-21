@@ -51,7 +51,13 @@ class Expr(object):
     self.build_graph()
     logging.info("built graph")
 
-    eval_saver = tf.train.Saver(tf.global_variables())
+    if self.model.var_moving_average_decay > 0:
+      variable_averages = tf.train.ExponentialMovingAverage(
+          self.model.var_moving_average_decay)
+      variables_to_restore = variable_averages.variables_to_restore()
+      eval_saver = tf.train.Saver(variables_to_restore)
+    else:
+      eval_saver = tf.train.Saver(tf.global_variables())
 
     if self.stage == "train":
       train_loop.train_loop(self)
@@ -116,7 +122,7 @@ class Expr(object):
           num_epochs=self.config.num_epochs)
       feature_dim = len(model_input_raw.get_shape()) - 1
 
-      if self.model.normazlie_input:
+      if self.model.normalize_input:
         print("L2 Normalizing input")
         model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
 
