@@ -1,10 +1,8 @@
-import time
-
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
 from tensorflow import app
 from tensorflow import gfile
 from tensorflow import logging
+from tensorflow import flags
 
 from yt8m.models import losses
 from yt8m.starter import frame_level_models
@@ -12,26 +10,39 @@ from yt8m.starter import video_level_models
 from yt8m.models.lstm import lstm
 from yt8m.data_io import readers
 import utils
+from .config import base as base_config
+import train_loop
+import eval_loop
+import inference_loop
+
+FLAGS = flags.FLAGS
+
+flags.DEFINE_string("stage", "train", "")
+flags.DEFINE_string("model_ckpt_path", "", "")
+flags.DEFINE_string("config_name", "BaseConfig", "")
 
 class Expr(object):
   def __init__(self):
-    self.phase_train = ""
+    self.stage = FLAGS.stage
+    self.model_ckpt_path = FLAGS.model_ckpt_path
+    self.config = utils.find_class_by_name(FLAGS.config_name,
+                                           [base_config,])(self.stage)
+    self.phase_train = self.config.phase_train
     self.task = 0
     self.ps_tasks = 0
     self.is_chief = (self.task == 0)
     self.master = ""
 
-    self.train_dir = ""
-    self.config = config()
+    self.train_dir = self.config.train_dir
 
     saver = None
     if self.phase_train:
-      saver = recover_session()
+      saver = self.recover_session()
     else:
       tf.set_random_seed(0)
 
     if not saver:
-      self.reader = get_reader()
+      self.reader = self.get_reader()
       self.num_classes = self.reader.num_classes
 
       self.model = utils.find_class_by_name(self.config.model_name,
@@ -41,22 +52,22 @@ class Expr(object):
       self.optimizer = utils.find_class_by_name(
           self.config.optimizer, [tf.train])
 
-      build_graph(
-                  train_data_pattern=FLAGS.train_data_pattern,
-                  regularization_penalty=FLAGS.regularization_penalty,
-                  )
+      self.build_graph()
       logging.info("built graph")
-      if phase_train:
+      if self.phase_train:
         saver = tf.train.Saver(max_to_keep=1000000)
       else:
         saver = tf.train.Saver(tf.global_variables())
 
-    if phase_train:
-      self.train_loop(saver)
-    else:
-      self.evaluation_loop(saver)
+    if self.stage == "train":
+      train_loop.train_loop(self, saver)
+    elif self.stage == "eval":
+      eval_loop.evaluation_loop(self, saver)
+    elif self.stage == "inference":
+      inference_loop.inference_loop(self, saver)
 
-  def get_input_data_tensors(data_pattern,
+  def get_input_data_tensors(self,
+                             data_pattern,
                              num_epochs=None,
                              num_readers=1):
     logging.info("Using batch size of " + str(self.batch_size) + ".")
@@ -82,7 +93,7 @@ class Expr(object):
         return tf.train.batch_join(
             data,
             batch_size=self.batch_size,
-            capacity=3 * self.batch_size,
+            capacity=self.batch_size * 3,
             allow_smaller_final_batch=True)
 
   def get_reader(self):
@@ -100,7 +111,7 @@ class Expr(object):
           feature_sizes=feature_sizes)
     return reader
 
-  def recover_session():
+  def recover_session(self):
     # Recover session
     saver = None
     latest_checkpoint = tf.train.latest_checkpoint(self.train_dir)
@@ -124,18 +135,13 @@ class Expr(object):
         saver = tf.train.import_meta_graph(meta_filename)
     return saver
 
-  def build_graph(self,
-                train_data_pattern,
-                regularization_penalty=1e-3,
-                ):
+  def build_graph(self):
     with tf.device(tf.train.replica_device_setter(
         self.ps_tasks, merge_devices=True)):
       self.global_step = tf.Variable(0, trainable=False, name="global_step")
 
-      opt = self.optimizer(self.config.base_learning_rate)
-
-      video_id_batch, model_input_raw, labels_batch, num_frames = get_input_data_tensors(
-          train_data_pattern,
+      video_id_batch, model_input_raw, labels_batch, num_frames = self.get_input_data_tensors(
+          self.config.data_pattern,
           num_readers=self.config.num_readers,
           num_epochs=self.config.num_epochs)
       feature_dim = len(model_input_raw.get_shape()) - 1
@@ -158,20 +164,31 @@ class Expr(object):
         else:
           label_loss = self.label_loss_fn.calculate_loss(predictions, labels_batch)
 
-      if phase_train:
-        self.get_train_op()
+      labels_batch = tf.cast(labels_batch, tf.float32)
 
-      tf.add_to_collection("global_step", global_step)
-      tf.add_to_collection("loss", label_loss)
-      tf.add_to_collection("predictions", predictions)
-      tf.add_to_collection("input_batch_raw", model_input_raw)
-      tf.add_to_collection("input_batch", model_input)
-      tf.add_to_collection("num_frames", num_frames)
-      tf.add_to_collection("labels", tf.cast(labels_batch, tf.float32))
-      tf.add_to_collection("train_op", train_op)
-      tf.add_to_collection("global_norm", global_norm)
+      if self.stage == "train":
+        opt = self.optimizer(self.config.base_learning_rate)
+        train_op, label_loss, global_norm = train_loop.get_train_op(self, opt, result, label_loss)
+        self.feed_out = {
+            "train_op": train_op,
+            "loss": label_loss,
+            "global_step": self.global_step,
+            "predictions": predictions,
+            "labels": labels_batch,
+            "global_norm": global_norm,
+        }
+      elif self.stage == "inference":
+        self.feed_out = {
+          "video_id": video_id_batch,
+          "predictions": predictions,
+          "labels": labels_batch,
+        }
+      elif self.stage == "test":
+        self.feed_out = {
+          "video_id": video_id_batch,
+          "predictions": predictions,
+        }
 
-      tf.add_to_collection("video_id_batch", video_id_batch)
 
 def main(unused_argv):
   logging.set_verbosity(tf.logging.INFO)

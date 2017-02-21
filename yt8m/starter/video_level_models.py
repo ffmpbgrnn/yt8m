@@ -15,16 +15,11 @@
 """Contains model definitions."""
 import math
 
-from tensorflow import flags
 import tensorflow.contrib.slim as slim
 import tensorflow as tf
 
 from yt8m.models import models
 
-FLAGS = flags.FLAGS
-flags.DEFINE_integer(
-    "moe_num_mixtures", 2,
-    "The number of mixtures (excluding the dummy 'expert') used for MoeModel.")
 
 class LogisticModel(models.BaseModel):
   """Logistic model with L2 regularization."""
@@ -44,6 +39,9 @@ class LogisticModel(models.BaseModel):
         model_input, vocab_size, activation_fn=tf.nn.sigmoid,
         weights_regularizer=slim.l2_regularizer(0.01))
     return {"predictions": output}
+
+class MoeConfig(object):
+  moe_num_mixtures = 2
 
 class MoeModel(models.BaseModel):
   """A softmax over a mixture of logistic models (with L2 regularization)."""
@@ -72,7 +70,7 @@ class MoeModel(models.BaseModel):
       model in the 'predictions' key. The dimensions of the tensor are
       batch_size x num_classes.
     """
-    num_mixtures = num_mixtures or FLAGS.moe_num_mixtures
+    num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
 
     gate_activations = slim.fully_connected(
         model_input,

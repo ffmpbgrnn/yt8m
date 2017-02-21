@@ -19,32 +19,11 @@ import math
 import tensorflow as tf
 
 import tensorflow.contrib.slim as slim
-from tensorflow import flags
 
 from yt8m.models import models
 from yt8m.models import model_utils as utils
 from . import video_level_models
 
-FLAGS = flags.FLAGS
-flags.DEFINE_integer("iterations", 30,
-                     "Number of frames per batch for DBoF.")
-flags.DEFINE_bool("dbof_add_batch_norm", True,
-                  "Adds batch normalization to the DBoF model.")
-flags.DEFINE_bool(
-    "sample_random_frames", True,
-    "If true samples random frames (for frame level models). If false, a random"
-    "sequence of frames is sampled instead.")
-flags.DEFINE_integer("dbof_cluster_size", 8192,
-                     "Number of units in the DBoF cluster layer.")
-flags.DEFINE_integer("dbof_hidden_size", 1024,
-                     "Number of units in the DBoF hidden layer.")
-flags.DEFINE_string("dbof_pooling_method", "max",
-                    "The pooling method used in the DBoF cluster layer. "
-                    "Choices are 'average' and 'max'.")
-flags.DEFINE_string("video_level_classifier_model", "MoeModel",
-                    "Some Frame-Level models can be decomposed into a "
-                    "generalized pooling operation followed by a "
-                    "classifier layer")
 
 class FrameLevelLogisticModel(models.BaseModel):
 
@@ -81,6 +60,16 @@ class FrameLevelLogisticModel(models.BaseModel):
         weights_regularizer=slim.l2_regularizer(0.01))
     return {"predictions": output}
 
+
+class DBoFConfig(object):
+  iterations = 30
+  dbof_add_batch_norm = True
+  sample_random_frames = True
+  dbof_cluster_size = 8192
+  dbof_hidden_size = 1024
+  dbof_pooling_method = "max"
+  video_level_classifier_model = "MoeModel"
+
 class DBoFModel(models.BaseModel):
   """Creates a Deep Bag of Frames model.
 
@@ -115,11 +104,11 @@ class DBoFModel(models.BaseModel):
                    hidden_size=None,
                    is_training=True,
                    **unused_params):
-    iterations = iterations or FLAGS.iterations
-    add_batch_norm = add_batch_norm or FLAGS.dbof_add_batch_norm
-    random_frames = sample_random_frames or FLAGS.sample_random_frames
-    cluster_size = cluster_size or FLAGS.dbof_cluster_size
-    hidden1_size = hidden_size or FLAGS.dbof_hidden_size
+    iterations = iterations or DBoFConfig.iterations
+    add_batch_norm = add_batch_norm or DBoFConfig.dbof_add_batch_norm
+    random_frames = sample_random_frames or DBoFConfig.sample_random_frames
+    cluster_size = cluster_size or DBoFConfig.dbof_cluster_size
+    hidden1_size = hidden_size or DBoFConfig.dbof_hidden_size
 
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     if random_frames:
@@ -163,7 +152,7 @@ class DBoFModel(models.BaseModel):
     tf.summary.histogram("cluster_output", activation)
 
     activation = tf.reshape(activation, [-1, max_frames, cluster_size])
-    activation = utils.FramePooling(activation, FLAGS.dbof_pooling_method)
+    activation = utils.FramePooling(activation, DBoFConfig.dbof_pooling_method)
 
     hidden1_weights = tf.Variable(tf.random_normal(
         [cluster_size, hidden1_size],
@@ -187,7 +176,7 @@ class DBoFModel(models.BaseModel):
     tf.summary.histogram("hidden1_output", activation)
 
     aggregated_model = getattr(video_level_models,
-                               FLAGS.video_level_classifier_model)
+                               DBoFConfig.video_level_classifier_model)
     return aggregated_model().create_model(
         model_input=activation,
         vocab_size=vocab_size,
