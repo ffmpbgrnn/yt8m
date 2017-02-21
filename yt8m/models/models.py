@@ -20,6 +20,8 @@ class BaseModel(object):
     self.normalize_input = True
     self.clip_global_norm = 0
     self.var_moving_average_decay = 0
+    self.optimizer_name = "AdamOptimizer"
+    self.base_learning_rate = 1e-2
 
   def create_model(self, unused_model_input, **unused_params):
     raise NotImplementedError()

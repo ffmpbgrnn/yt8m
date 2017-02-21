@@ -46,7 +46,7 @@ class Expr(object):
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
-        self.config.optimizer, [tf.train])
+        self.model.optimizer_name, [tf.train])
 
     self.build_graph()
     logging.info("built graph")
@@ -143,7 +143,7 @@ class Expr(object):
       labels_batch = tf.cast(labels_batch, tf.float32)
 
       if self.stage == "train":
-        opt = self.optimizer(self.config.base_learning_rate)
+        opt = self.optimizer(self.model.base_learning_rate)
         train_op, label_loss, global_norm = train_loop.get_train_op(self, opt, result, label_loss)
         self.feed_out = {
             "train_op": train_op,

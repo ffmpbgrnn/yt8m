@@ -44,14 +44,8 @@ class BaseConfig(object):
     self.use_frame_features = True
 
     self.model_name = "FrameLevelLogisticModel"
+    self.model_name == "LSTMEncoder"
     self.label_loss = "CrossEntropyLoss"
-
-    if self.model_name == "FrameLevelLogisticModel":
-      self.optimizer = "AdamOptimizer"
-      self.base_learning_rate = 1e-2
-    elif self.model_name == "LSTM":
-      self.optimizer = "AdamOptimizer"
-      self.base_learning_rate = 3e-4
 
     self.regularization_penalty = 1e-5
 

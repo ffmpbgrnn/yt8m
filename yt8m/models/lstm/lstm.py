@@ -31,6 +31,8 @@ class LSTMEncoder(models.BaseModel):
     self.normalize_input = False
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
+    self.optimizer_name = "AdamOptimizer"
+    self.base_learning_rate = 3e-4
 
     self.cell_size = 1024
     self.max_steps = 30
