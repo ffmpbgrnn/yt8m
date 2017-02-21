@@ -33,7 +33,7 @@ class Expr(object):
     self.is_chief = (self.task == 0)
     self.master = ""
 
-    self.train_dir = self.config.train_dir
+    self.batch_size = self.config.batch_size
 
     if not self.phase_train:
       tf.set_random_seed(0)

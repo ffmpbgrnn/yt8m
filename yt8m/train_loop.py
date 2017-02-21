@@ -11,7 +11,7 @@ slim = tf.contrib.slim
 def train_loop(self, start_supervisor_services=True):
   saver = tf.train.Saver(max_to_keep=1000000)
 
-  sv = tf.train.Supervisor(logdir=self.train_dir,
+  sv = tf.train.Supervisor(logdir=self.config.train_dir,
                            is_chief=self.is_chief,
                            global_step=self.global_step,
                            save_model_secs=600,
@@ -32,8 +32,7 @@ def train_loop(self, start_supervisor_services=True):
       batch_start_time = time.time()
       res = sess.run(self.feed_out)
 
-      globa_step = res["global_step"]
-      loss_val = res["loss"]
+      global_step = res["global_step"]
       predictions = res["predictions"]
       labels = res["labels"]
 
@@ -47,8 +46,8 @@ def train_loop(self, start_supervisor_services=True):
 
       logging.info("training step " + str(global_step) + "| Hit@1: " + (
           "%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
-          " GAP: " + ("%.2f" % gap) + " Loss: " + str(loss_val))
-      if self.is_chief and global_step % 10 == 0 and self.train_dir:
+          " GAP: " + ("%.2f" % gap) + " Loss: " + str(res["loss"]))
+      if self.is_chief and global_step % 10 == 0 and self.config.train_dir:
         sv.summary_writer.add_summary(
             utils.MakeSummary("model/Training_Hit@1",
                               hit_at_one), global_step)
