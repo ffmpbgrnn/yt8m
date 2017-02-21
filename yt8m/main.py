@@ -35,36 +35,30 @@ class Expr(object):
 
     self.train_dir = self.config.train_dir
 
-    saver = None
-    if self.phase_train:
-      saver = self.recover_session()
-    else:
+    if not self.phase_train:
       tf.set_random_seed(0)
 
-    if not saver:
-      self.reader = self.get_reader()
-      self.num_classes = self.reader.num_classes
+    self.reader = self.get_reader()
+    self.num_classes = self.reader.num_classes
 
-      self.model = utils.find_class_by_name(self.config.model_name,
-          [frame_level_models, video_level_models, lstm])()
-      self.label_loss_fn = utils.find_class_by_name(
-          self.config.label_loss, [losses])()
-      self.optimizer = utils.find_class_by_name(
-          self.config.optimizer, [tf.train])
+    self.model = utils.find_class_by_name(self.config.model_name,
+        [frame_level_models, video_level_models, lstm])()
+    self.label_loss_fn = utils.find_class_by_name(
+        self.config.label_loss, [losses])()
+    self.optimizer = utils.find_class_by_name(
+        self.config.optimizer, [tf.train])
 
-      self.build_graph()
-      logging.info("built graph")
-      if self.phase_train:
-        saver = tf.train.Saver(max_to_keep=1000000)
-      else:
-        saver = tf.train.Saver(tf.global_variables())
+    self.build_graph()
+    logging.info("built graph")
+
+    eval_saver = tf.train.Saver(tf.global_variables())
 
     if self.stage == "train":
-      train_loop.train_loop(self, saver)
+      train_loop.train_loop(self)
     elif self.stage == "eval":
-      eval_loop.evaluation_loop(self, saver)
+      eval_loop.evaluation_loop(self, eval_saver, self.model_ckpt_path)
     elif self.stage == "inference":
-      inference_loop.inference_loop(self, saver)
+      inference_loop.inference_loop(self, eval_saver, self.model_ckpt_path)
 
   def get_input_data_tensors(self,
                              data_pattern,
@@ -111,30 +105,6 @@ class Expr(object):
           feature_sizes=feature_sizes)
     return reader
 
-  def recover_session(self):
-    # Recover session
-    saver = None
-    latest_checkpoint = tf.train.latest_checkpoint(self.train_dir)
-    if self.config.start_new_model:
-      logging.info("'start_new_model' flag is set. Removing existing train dir.")
-      try:
-        gfile.DeleteRecursively(self.train_dir)
-      except:
-        logging.error(
-            "Failed to delete directory " + self.train_dir +
-            " when starting a new model. Please delete it manually and" +
-            " try again.")
-    elif not latest_checkpoint:
-      logging.info("No checkpoint file found. Building a new model.")
-    else:
-      meta_filename = latest_checkpoint + ".meta"
-      if not gfile.Exists(meta_filename):
-        logging.info("No meta graph file found. Building a new model.")
-      else:
-        logging.info("Restoring from meta graph file %s", meta_filename)
-        saver = tf.train.import_meta_graph(meta_filename)
-    return saver
-
   def build_graph(self):
     with tf.device(tf.train.replica_device_setter(
         self.ps_tasks, merge_devices=True)):
@@ -177,13 +147,14 @@ class Expr(object):
             "labels": labels_batch,
             "global_norm": global_norm,
         }
-      elif self.stage == "inference":
+      elif self.stage == "eval":
         self.feed_out = {
           "video_id": video_id_batch,
           "predictions": predictions,
           "labels": labels_batch,
+          "loss": label_loss
         }
-      elif self.stage == "test":
+      elif self.stage == "inference":
         self.feed_out = {
           "video_id": video_id_batch,
           "predictions": predictions,

@@ -68,22 +68,23 @@ def AddGlobalStepSummary(summary_writer,
   this_loss = global_step_info_dict["loss"]
   examples_per_second = global_step_info_dict.get("examples_per_second", -1)
 
-  summary_writer.add_summary(
-      MakeSummary("GlobalStep/" + summary_scope + "_Hit@1", this_hit_at_one),
-      global_step_val)
-  summary_writer.add_summary(
-      MakeSummary("GlobalStep/" + summary_scope + "_Perr", this_perr),
-      global_step_val)
-  summary_writer.add_summary(
-      MakeSummary("GlobalStep/" + summary_scope + "_Loss", this_loss),
-      global_step_val)
+  if summary_writer:
+    summary_writer.add_summary(
+        MakeSummary("GlobalStep/" + summary_scope + "_Hit@1", this_hit_at_one),
+        global_step_val)
+    summary_writer.add_summary(
+        MakeSummary("GlobalStep/" + summary_scope + "_Perr", this_perr),
+        global_step_val)
+    summary_writer.add_summary(
+        MakeSummary("GlobalStep/" + summary_scope + "_Loss", this_loss),
+        global_step_val)
 
-  if examples_per_second != -1:
+  if summary_writer and examples_per_second != -1:
     summary_writer.add_summary(
         MakeSummary("GlobalStep/" + summary_scope + "_Example_Second",
                     examples_per_second), global_step_val)
-
-  summary_writer.flush()
+  if summary_writer:
+    summary_writer.flush()
   info = ("global_step {0} | Batch Hit@1: {1:.3f} | Batch PERR: {2:.3f} | Batch Loss: {3:.3f} "
           "| Examples_per_sec: {4:.3f}").format(
               global_step_val, this_hit_at_one, this_perr, this_loss,
@@ -115,22 +116,23 @@ def AddEpochSummary(summary_writer,
   gap = epoch_info_dict["gap"]
   mean_ap = numpy.mean(aps)
 
-  summary_writer.add_summary(
-      MakeSummary("Epoch/" + summary_scope + "_Avg_Hit@1", avg_hit_at_one),
-      global_step_val)
-  summary_writer.add_summary(
-      MakeSummary("Epoch/" + summary_scope + "_Avg_Perr", avg_perr),
-      global_step_val)
-  summary_writer.add_summary(
-      MakeSummary("Epoch/" + summary_scope + "_Avg_Loss", avg_loss),
-      global_step_val)
-  summary_writer.add_summary(
-      MakeSummary("Epoch/" + summary_scope + "_MAP", mean_ap),
-          global_step_val)
-  summary_writer.add_summary(
-      MakeSummary("Epoch/" + summary_scope + "_GAP", gap),
-          global_step_val)
-  summary_writer.flush()
+  if summary_writer:
+    summary_writer.add_summary(
+        MakeSummary("Epoch/" + summary_scope + "_Avg_Hit@1", avg_hit_at_one),
+        global_step_val)
+    summary_writer.add_summary(
+        MakeSummary("Epoch/" + summary_scope + "_Avg_Perr", avg_perr),
+        global_step_val)
+    summary_writer.add_summary(
+        MakeSummary("Epoch/" + summary_scope + "_Avg_Loss", avg_loss),
+        global_step_val)
+    summary_writer.add_summary(
+        MakeSummary("Epoch/" + summary_scope + "_MAP", mean_ap),
+            global_step_val)
+    summary_writer.add_summary(
+        MakeSummary("Epoch/" + summary_scope + "_GAP", gap),
+            global_step_val)
+    summary_writer.flush()
 
   info = ("epoch/eval number {0} | Avg_Hit@1: {1:.3f} | Avg_PERR: {2:.3f} "
           "| MAP: {3:.3f} | GAP: {4:.3f} | Avg_Loss: {5:3f}").format(
@@ -150,9 +152,9 @@ def GetListOfFeatureNamesAndSizes(feature_names, feature_sizes):
     Elements in the first/second list are strings/integers.
   """
   list_of_feature_names = [
-      feature_names.strip() for feature_names in feature_names.split(',')]
+      feature_name.strip() for feature_name in feature_names.split(',')]
   list_of_feature_sizes = [
-      int(feature_sizes) for feature_sizes in feature_sizes.split(',')]
+      int(feature_size) for feature_size in feature_sizes.split(',')]
   if len(list_of_feature_names) != len(list_of_feature_sizes):
     logging.error("length of the feature names (=" +
                   str(len(list_of_feature_names)) + ") != length of feature "

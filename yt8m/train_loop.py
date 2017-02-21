@@ -1,18 +1,15 @@
 import time
 
 import tensorflow as tf
+from tensorflow import gfile
 from tensorflow import logging
 from yt8m.evaluation import eval_util
 import utils
 
 slim = tf.contrib.slim
 
-def train_loop(self, saver=None,
-               start_supervisor_services=True):
-  loss = tf.get_collection("loss")[0]
-  predictions = tf.get_collection("predictions")[0]
-  labels = tf.get_collection("labels")[0]
-  train_op = tf.get_collection("train_op")[0]
+def train_loop(self, start_supervisor_services=True):
+  saver = tf.train.Saver(max_to_keep=1000000)
 
   sv = tf.train.Supervisor(logdir=self.train_dir,
                            is_chief=self.is_chief,
@@ -33,33 +30,38 @@ def train_loop(self, saver=None,
     logging.info("entering training loop")
     while not sv.should_stop():
       batch_start_time = time.time()
-      _, global_step_val, loss_val, predictions_val, labels_val = sess.run(
-          [train_op, self.global_step, loss, predictions, labels])
+      res = sess.run(self.feed_out)
+
+      globa_step = res["global_step"]
+      loss_val = res["loss"]
+      predictions = res["predictions"]
+      labels = res["labels"]
+
       seconds_per_batch = time.time() - batch_start_time
-      examples_per_second = labels_val.shape[0] / seconds_per_batch
+      examples_per_second = labels.shape[0] / seconds_per_batch
 
-      hit_at_one = eval_util.calculate_hit_at_one(predictions_val, labels_val)
-      perr = eval_util.calculate_precision_at_equal_recall_rate(predictions_val,
-                                                                labels_val)
-      gap = eval_util.calculate_gap(predictions_val, labels_val)
+      hit_at_one = eval_util.calculate_hit_at_one(predictions, labels)
+      perr = eval_util.calculate_precision_at_equal_recall_rate(predictions,
+                                                                labels)
+      gap = eval_util.calculate_gap(predictions, labels)
 
-      logging.info("training step " + str(global_step_val) + "| Hit@1: " + (
+      logging.info("training step " + str(global_step) + "| Hit@1: " + (
           "%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
           " GAP: " + ("%.2f" % gap) + " Loss: " + str(loss_val))
-      if self.is_chief and global_step_val % 10 == 0 and self.train_dir:
+      if self.is_chief and global_step % 10 == 0 and self.train_dir:
         sv.summary_writer.add_summary(
             utils.MakeSummary("model/Training_Hit@1",
-                              hit_at_one), global_step_val)
+                              hit_at_one), global_step)
         sv.summary_writer.add_summary(
             utils.MakeSummary("model/Training_Perr", perr),
-            global_step_val)
+            global_step)
         sv.summary_writer.add_summary(
             utils.MakeSummary("model/Training_GAP", gap),
-            global_step_val)
+            global_step)
         sv.summary_writer.add_summary(
             utils.MakeSummary("global_step/Examples/Second",
                               examples_per_second),
-            global_step_val)
+            global_step)
         sv.summary_writer.flush()
   except tf.errors.OutOfRangeError:
     logging.info("Done training -- epoch limit reached")
@@ -108,3 +110,27 @@ def get_train_op(self, opt, result, label_loss):
     train_op = tf.group(train_op, variables_averages_op)
 
   return train_op, label_loss, global_norm
+
+def recover_session(self):
+  # Recover session
+  saver = None
+  latest_checkpoint = tf.train.latest_checkpoint(self.train_dir)
+  if self.config.start_new_model:
+    logging.info("'start_new_model' flag is set. Removing existing train dir.")
+    try:
+      gfile.DeleteRecursively(self.train_dir)
+    except:
+      logging.error(
+          "Failed to delete directory " + self.train_dir +
+          " when starting a new model. Please delete it manually and" +
+          " try again.")
+  elif not latest_checkpoint:
+    logging.info("No checkpoint file found. Building a new model.")
+  else:
+    meta_filename = latest_checkpoint + ".meta"
+    if not gfile.Exists(meta_filename):
+      logging.info("No meta graph file found. Building a new model.")
+    else:
+      logging.info("Restoring from meta graph file %s", meta_filename)
+      saver = tf.train.import_meta_graph(meta_filename)
+  return saver
