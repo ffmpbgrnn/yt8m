@@ -31,11 +31,11 @@ class LSTMEncoder(models.BaseModel):
 
     self.normazlie_input = False
     self.clip_global_norm = 5
-    self.var_moving_average_decay = 0.999
+    self.var_moving_average_decay = 0#0.999
 
     self.cell_size = lstm_config.cell_size
     # TODO
-    self.phase_train = True
+    self.phase_train = False
     self.max_steps = lstm_config.max_steps
     print(self.max_steps)
 
@@ -85,7 +85,8 @@ class LSTMEncoder(models.BaseModel):
 
     output = slim.fully_connected(
         avg_pooled, vocab_size, activation_fn=tf.nn.sigmoid,
-        weights_regularizer=slim.l2_regularizer(0.01))
+        weights_regularizer=slim.l2_regularizer(1e-5),)
+        # weights_regularizer=slim.l2_regularizer(1e-5), scope="output0")
     return {"predictions": output}
 
   def get_enc_cell(self, cell_size, vocab_size):
