@@ -44,9 +44,17 @@ def train_loop(self, start_supervisor_services=True):
                                                                 labels)
       gap = eval_util.calculate_gap(predictions, labels)
 
-      logging.info("training step " + str(global_step) + "| Hit@1: " + (
-          "%.2f" % hit_at_one) + " PERR: " + ("%.2f" % perr) +
-          " GAP: " + ("%.2f" % gap) + " Loss: " + str(res["loss"]))
+      log_info_str, log_info = "", {
+          "Training step": global_step,
+          "Hit@1": hit_at_one,
+          "PERR": perr,
+          "GAP": gap,
+          "Loss": res["loss"],
+          "Global norm": res["global_norm"],
+      }
+      for k, v in log_info.iteritems():
+        log_info_str += "%s: %.2f;\t" % (k, v)
+      logging.info(log_info_str)
       if self.is_chief and global_step % 10 == 0 and self.config.train_dir:
         sv.summary_writer.add_summary(
             utils.MakeSummary("model/Training_Hit@1",

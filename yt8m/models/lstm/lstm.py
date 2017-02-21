@@ -36,7 +36,6 @@ class LSTMEncoder(models.BaseModel):
 
     self.cell_size = 1024
     self.max_steps = 30
-    print(self.max_steps)
 
   def create_model(self, model_input, vocab_size, num_frames,
                    is_training=True, **unused_params):

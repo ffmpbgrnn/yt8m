@@ -125,6 +125,8 @@ class Expr(object):
       if self.model.normalize_input:
         print("L2 Normalizing input")
         model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
+      else:
+        model_input = model_input_raw
 
       with tf.name_scope("model"):
         result = self.model.create_model(

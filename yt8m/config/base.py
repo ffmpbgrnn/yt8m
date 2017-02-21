@@ -43,8 +43,11 @@ class BaseConfig(object):
     self.feature_sizes = "1024"
     self.use_frame_features = True
 
-    self.model_name = "FrameLevelLogisticModel"
-    self.model_name == "LSTMEncoder"
+    model_names = [
+        "FrameLevelLogisticModel",
+        "LSTMEncoder",
+    ]
+    self.model_name = "LSTMEncoder"
     self.label_loss = "CrossEntropyLoss"
 
     self.regularization_penalty = 1e-5
