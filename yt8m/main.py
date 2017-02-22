@@ -88,13 +88,15 @@ class Expr(object):
             batch_size=self.batch_size,
             capacity=self.batch_size * 10,
             min_after_dequeue=self.batch_size,
-            allow_smaller_final_batch=True)
+            allow_smaller_final_batch=True,
+            enqueue_many=True)
       else:
         return tf.train.batch_join(
             data,
             batch_size=self.batch_size,
             capacity=self.batch_size * 3,
-            allow_smaller_final_batch=True)
+            allow_smaller_final_batch=True,
+            enqueue_many=True)
 
   def get_reader(self):
     # convert feature_names and feature_sizes to lists of values
