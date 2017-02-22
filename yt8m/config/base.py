@@ -39,15 +39,15 @@ class BaseConfig(object):
       self.num_epochs = 1
       self.batch_size = 512
 
-    self.feature_names = "rgb"
-    self.feature_sizes = "1024"
+    self.feature_names = "rgb, audio"
+    self.feature_sizes = "1024, 128"
     self.use_frame_features = True
 
     model_names = [
         "FrameLevelLogisticModel",
         "LSTMEncoder",
     ]
-    self.model_name = "LSTMEncoder"
+    self.model_name = "FrameLevelLogisticModel"
     self.label_loss = "CrossEntropyLoss"
 
     self.regularization_penalty = 1e-5

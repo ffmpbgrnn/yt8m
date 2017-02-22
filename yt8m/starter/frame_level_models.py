@@ -62,7 +62,8 @@ class FrameLevelLogisticModel(models.BaseModel):
 
 
 class DBoFConfig(object):
-  iterations = 30
+  train_iterations = 30
+  eval_iterations = 300
   dbof_add_batch_norm = True
   sample_random_frames = True
   dbof_cluster_size = 8192
@@ -104,7 +105,10 @@ class DBoFModel(models.BaseModel):
                    hidden_size=None,
                    is_training=True,
                    **unused_params):
-    iterations = iterations or DBoFConfig.iterations
+    if is_training:
+      iterations = iterations or DBoFConfig.train_iterations
+    else:
+      iterations = iterations or DBoFConfig.eval_iterations
     add_batch_norm = add_batch_norm or DBoFConfig.dbof_add_batch_norm
     random_frames = sample_random_frames or DBoFConfig.sample_random_frames
     cluster_size = cluster_size or DBoFConfig.dbof_cluster_size
