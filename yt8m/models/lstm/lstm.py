@@ -35,7 +35,7 @@ class LSTMEncoder(models.BaseModel):
     self.base_learning_rate = 3e-4
 
     self.cell_size = 1024
-    self.max_steps = 30
+    self.max_steps = 150
 
   def create_model(self, model_input, vocab_size, num_frames,
                    is_training=True, **unused_params):

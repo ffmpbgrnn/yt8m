@@ -63,7 +63,7 @@ class FrameLevelLogisticModel(models.BaseModel):
 
 class DBoFConfig(object):
   train_iterations = 30
-  eval_iterations = 300
+  eval_iterations = 30
   dbof_add_batch_norm = True
   sample_random_frames = True
   dbof_cluster_size = 8192

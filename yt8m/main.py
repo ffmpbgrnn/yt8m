@@ -52,6 +52,7 @@ class Expr(object):
     logging.info("built graph")
 
     if self.model.var_moving_average_decay > 0:
+      print("Using moving average")
       variable_averages = tf.train.ExponentialMovingAverage(
           self.model.var_moving_average_decay)
       variables_to_restore = variable_averages.variables_to_restore()
