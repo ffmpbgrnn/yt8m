@@ -37,17 +37,41 @@ def main(_):
   # sparse_labels = tf.gather(sparse_labels, tf.nn.top_k(sparse_labels, k=3,).indices)
 
   num_max_labels = 10
-  def sort_and_pad(x):
+  def sort_and_pad_old(x):
     x = np.sort(x)
+    w = np.ones((num_max_labels), dtype=np.int64)
     if x.shape[0] > num_max_labels:
       s = np.random.randint(x.shape[0] - num_max_labels + 1)
       x = x[s:]
     else:
       pad = np.zeros((num_max_labels), dtype=np.int64)
       pad[: x.shape[0]] = x
+      w[x.shape[0]:] = 0
       x = pad
-    return x
-  sparse_labels = tf.py_func(sort_and_pad, [sparse_labels], tf.int64)
+    return (x, w)
+  sos_id, eos_id, pad_id = 10000, 10001, 10002
+  def sort_and_pad(x):
+    x = np.sort(x)
+    x = x.tolist()
+    w = np.ones((num_max_labels), dtype=np.int64)
+    w[-1] = 0
+    caps_len = num_max_labels - 2
+    if len(x) > caps_len:
+      s = np.random.randint(len(x) - caps_len + 1)
+      x = [sos_id] + x[s: s+caps_len] + [eos_id]
+    else:
+      x = [sos_id] + x + [eos_id]
+      num_pad = num_max_labels - len(x)
+      x = x + [pad_id] * num_pad
+      w[-1 * num_pad - 1:] = 0
+
+      # pad = np.zeros((num_max_labels,), dtype=np.int64)
+      # pad[: len(x)] = x
+      # w[x.shape[0]:] = 0
+      # x = pad
+    return (x, w)
+
+  sparse_labels, label_weights = tf.py_func(sort_and_pad, [sparse_labels], [tf.int64, tf.int64])
 
   # labels = (tf.cast(
       # tf.sparse_to_dense(sparse_labels, (4718,), 1,
@@ -57,7 +81,7 @@ def main(_):
     sess.run(tf.local_variables_initializer())
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-    print(sess.run(sparse_labels))
+    print(sess.run([sparse_labels, label_weights]))
     # print(sess.run(labels))
     coord.request_stop()
     coord.join(threads)
