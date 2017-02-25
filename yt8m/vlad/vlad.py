@@ -17,7 +17,8 @@ class HDFS():
   def __init__(self, stage, split_id):
     self.stage = stage
     self.split_id = split_id
-    self.fout = h5py.File("/data/uts711/linchao/yt8m_hdfs/{}/split_{}.h5".format(
+    # self.fout = h5py.File("/data/uts711/linchao/yt8m_hdfs/{}/split_{}.h5".format(
+    self.fout = h5py.File("/data/state/linchao/yt8m_hdfs/{}/split_{}.h5".format(
         self.stage, self.split_id), "w")
     self.label_dict = {}
 
@@ -181,7 +182,9 @@ def main(stage, split_id=""):
   task.done()
 
 
-main("train", sys.argv[1])
+# main("train", sys.argv[1])
+# main("validate", sys.argv[1])
+main("test", sys.argv[1])
 # main("train")
 # main("validate")
 # main("train")
