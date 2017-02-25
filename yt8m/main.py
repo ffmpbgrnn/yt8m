@@ -8,6 +8,7 @@ from yt8m.models import losses
 from yt8m.starter import frame_level_models
 from yt8m.starter import video_level_models
 from yt8m.models.lstm import lstm
+from yt8m.models.lstm import lstm_enc_dec
 from yt8m.data_io import readers
 import utils
 from .config import base as base_config
@@ -38,15 +39,15 @@ class Expr(object):
     if not self.phase_train:
       tf.set_random_seed(0)
 
-    self.reader = self.get_reader()
-    self.num_classes = self.reader.num_classes
-
     self.model = utils.find_class_by_name(self.config.model_name,
-        [frame_level_models, video_level_models, lstm])()
+        [frame_level_models, video_level_models, lstm, lstm_enc_dec])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
         self.model.optimizer_name, [tf.train])
+
+    self.reader = self.get_reader()
+    self.num_classes = self.reader.num_classes
 
     self.build_graph()
     logging.info("built graph")
@@ -107,6 +108,7 @@ class Expr(object):
     if self.config.use_frame_features:
       reader = readers.YT8MFrameFeatureReader(
           feature_names=feature_names,
+          num_max_labels=self.model.num_max_labels,
           feature_sizes=feature_sizes)
     else:
       reader = readers.YT8MAggregatedFeatureReader(
@@ -119,7 +121,7 @@ class Expr(object):
         self.ps_tasks, merge_devices=True)):
       self.global_step = tf.Variable(0, trainable=False, name="global_step")
 
-      video_id_batch, model_input_raw, labels_batch, num_frames = self.get_input_data_tensors(
+      video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = self.get_input_data_tensors(
           self.config.data_pattern,
           num_readers=self.config.num_readers,
           num_epochs=self.config.num_epochs)
@@ -136,16 +138,18 @@ class Expr(object):
             model_input,
             num_frames=num_frames,
             vocab_size=self.reader.num_classes,
-            labels=labels_batch,
+            dense_labels=dense_labels_batch,
+            sparse_labels=sparse_labels_batch,
+            label_weights=label_weights_batch,
             is_training=self.phase_train)
 
         predictions = result["predictions"]
         if "loss" in result.keys():
           label_loss = result["loss"]
         else:
-          label_loss = self.label_loss_fn.calculate_loss(predictions, labels_batch)
+          label_loss = self.label_loss_fn.calculate_loss(predictions, dense_labels_batch)
 
-      labels_batch = tf.cast(labels_batch, tf.float32)
+      dense_labels_batch = tf.cast(dense_labels_batch, tf.float32)
 
       if self.stage == "train":
         opt = self.optimizer(self.model.base_learning_rate)
@@ -155,14 +159,14 @@ class Expr(object):
             "loss": label_loss,
             "global_step": self.global_step,
             "predictions": predictions,
-            "labels": labels_batch,
+            "dense_labels": dense_labels_batch,
             "global_norm": global_norm,
         }
       elif self.stage == "eval":
         self.feed_out = {
           "video_id": video_id_batch,
           "predictions": predictions,
-          "labels": labels_batch,
+          "dense_labels": dense_labels_batch,
           "loss": label_loss
         }
       elif self.stage == "inference":

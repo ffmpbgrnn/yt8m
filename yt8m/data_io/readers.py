@@ -14,6 +14,7 @@
 
 """Provides readers configured for different datasets."""
 
+import numpy as np
 import tensorflow as tf
 from yt8m import utils
 
@@ -138,7 +139,8 @@ class YT8MFrameFeatureReader(BaseReader):
                num_classes=4716,
                feature_sizes=[1024],
                feature_names=["inc3"],
-               max_frames=300):
+               max_frames=300,
+               num_max_labels=-1):
     """Construct a YT8MFrameFeatureReader.
 
     Args:
@@ -156,6 +158,10 @@ class YT8MFrameFeatureReader(BaseReader):
     self.feature_sizes = feature_sizes
     self.feature_names = feature_names
     self.max_frames = max_frames
+    self.num_max_labels = num_max_labels
+    self.pad_id = self.num_classes
+    self.sos_id = self.num_classes + 1
+    self.eos_id = self.num_classes + 2
 
   def get_video_matrix(self,
                        features,
@@ -214,11 +220,40 @@ class YT8MFrameFeatureReader(BaseReader):
             for feature_name in self.feature_names
         })
 
+    def sort_and_pad(x):
+      x = np.sort(x)
+      x = x.tolist()
+      w = np.ones((self.num_max_labels), dtype=np.int64)
+      w[-1] = 0
+      caps_len = self.num_max_labels - 2
+      if len(x) > caps_len:
+        s = np.random.randint(len(x) - caps_len + 1)
+        x = [self.sos_id] + x[s: s+caps_len] + [self.eos_id]
+      else:
+        x = [self.sos_id] + x + [self.eos_id]
+        num_pad = self.num_max_labels - len(x)
+        x = x + [self.pad_id] * num_pad
+        w[-1 * num_pad - 1:] = 0
+
+        # pad = np.zeros((self.num_max_labels,), dtype=np.int64)
+        # pad[: len(x)] = x
+        # w[x.shape[0]:] = 0
+        # x = pad
+      return (x, w)
+
     # read ground truth labels
-    labels = (tf.cast(
-        tf.sparse_to_dense(contexts["labels"].values, (self.num_classes,), 1,
+    sparse_labels = contexts["labels"].values
+    dense_labels = (tf.cast(
+        tf.sparse_to_dense(sparse_labels, (self.num_classes,), 1,
             validate_indices=False),
         tf.bool))
+    if self.num_max_labels > 0:
+      sparse_labels, label_weights = tf.py_func(sort_and_pad, [sparse_labels], [tf.int64, tf.int64])
+      sparse_labels = tf.reshape(sparse_labels, [self.num_max_labels])
+      label_weights = tf.reshape(label_weights, [self.num_max_labels])
+    else:
+      sparse_labels = dense_labels
+      label_weights = tf.constant(1., dtype=tf.int64)
 
     # loads (potentially) different types of features and concatenates them
     num_features = len(self.feature_names)
@@ -254,7 +289,9 @@ class YT8MFrameFeatureReader(BaseReader):
     # TODO: Do proper batch reads to remove the IO bottleneck.
     batch_video_ids = tf.expand_dims(contexts["video_id"], 0)
     batch_video_matrix = tf.expand_dims(video_matrix, 0)
-    batch_labels = tf.expand_dims(labels, 0)
+    batch_dense_labels = tf.expand_dims(dense_labels, 0)
+    batch_sparse_labels = tf.expand_dims(sparse_labels, 0)
+    batch_label_weights = tf.expand_dims(label_weights, 0)
     batch_frames = tf.expand_dims(num_frames, 0)
 
-    return batch_video_ids, batch_video_matrix, batch_labels, batch_frames
+    return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, batch_frames, batch_label_weights

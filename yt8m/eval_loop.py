@@ -56,11 +56,11 @@ def evaluation_loop(self, saver, model_ckpt_path):
         batch_start_time = time.time()
         res = sess.run(self.feed_out)
         seconds_per_batch = time.time() - batch_start_time
-        example_per_second = res["labels"].shape[0] / seconds_per_batch
-        examples_processed += res["labels"].shape[0]
+        example_per_second = res["predictions"].shape[0] / seconds_per_batch
+        examples_processed += res["predictions"].shape[0]
 
         iteration_info_dict = evl_metrics.accumulate(
-            res["predictions"], res["labels"], res["loss"])
+            res["predictions"], res["dense_labels"], res["loss"])
         iteration_info_dict["examples_per_second"] = example_per_second
 
         iterinfo = utils.AddGlobalStepSummary(

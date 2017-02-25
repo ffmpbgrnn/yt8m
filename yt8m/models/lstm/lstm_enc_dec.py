@@ -26,7 +26,7 @@ class LSTMEncDec(models.BaseModel):
     self.num_max_labels = 10
 
   def create_model(self, model_input, vocab_size, num_frames,
-                   is_training=True, labels=None, label_weights=None,
+                   is_training=True, sparse_labels=None, label_weights=None,
                    **unused_params):
 
     self.phase_train = is_training
@@ -34,19 +34,24 @@ class LSTMEncDec(models.BaseModel):
     model_inputs = utils.SampleRandomSequence(model_input, num_frames,
                                               self.max_steps)
 
-    enc_cell = self.get_enc_cell(self.cell_size, vocab_size)
+    total_vocab_size = vocab_size + 3
+    enc_cell = self.get_enc_cell(self.cell_size, total_vocab_size)
     dec_cell = self.get_dec_cell(self.cell_size)
     runtime_batch_size = tf.shape(model_inputs)[0]
 
-    with tf.variable_scope("Enc"):
-      enc_init_state = enc_cell.zero_state(runtime_batch_size, dtype=tf.float32)
-      enc_outputs, enc_state = tf.nn.dynamic_rnn(
-          enc_cell, model_inputs, initial_state=enc_init_state, scope="enc")
+    if False:
+      with tf.variable_scope("Enc"):
+        enc_init_state = enc_cell.zero_state(runtime_batch_size, dtype=tf.float32)
+        enc_outputs, enc_state = tf.nn.dynamic_rnn(
+            enc_cell, model_inputs, initial_state=enc_init_state, scope="enc")
+    else:
+      enc_outputs = model_inputs
+      enc_state = dec_cell.zero_state(runtime_batch_size, dtype=tf.float32)
 
-    dec_inputs = labels
-    dec_weights = label_weights
+    label_weights = tf.cast(label_weights, tf.float32)
+    dec_weights = tf.unstack(label_weights, axis=1)
+    dec_input_lists = tf.unstack(sparse_labels, axis=1)
 
-    dec_input_lists = tf.unstack(dec_inputs, axis=1)
     dec_targets = [dec_input_lists[i + 1]
                    for i in xrange(len(dec_input_lists) - 1)]
     dec_targets += [tf.zeros_like(dec_input_lists[0])]
@@ -54,13 +59,18 @@ class LSTMEncDec(models.BaseModel):
     dec_outputs, _ = attn.embedding_attention_decoder(
         dec_input_lists, initial_state=enc_state,
         attention_states=enc_outputs,
-        cell=dec_cell, output_size=vocab_size,
+        cell=dec_cell, num_symbols=total_vocab_size, embedding_size=1024,
+        output_size=total_vocab_size,
         output_projection=None, feed_previous=False,
         dtype=tf.float32, scope="LSTMEncDec")
     loss = seq2seq_lib.sequence_loss(
         dec_outputs, dec_targets, dec_weights,
         softmax_loss_function=None)
-    logits = tf.reduce_mean(dec_outputs, axis=1)
+    # logits = tf.reduce_mean(dec_outputs, axis=0)
+    label_num = tf.reduce_sum(label_weights, axis=1, keep_dims=True)
+    logits = tf.add_n(dec_outputs) / label_num
+    # logits = tf.Print(logits.get_shape(), [logits])
+    logits = logits[:, :vocab_size]
     # logits = tf.nn.sigmoid(enc_outputs[:, -1, :])
     return {
         "predictions": logits,

@@ -34,15 +34,15 @@ def train_loop(self, start_supervisor_services=True):
 
       global_step = res["global_step"]
       predictions = res["predictions"]
-      labels = res["labels"]
+      dense_labels = res["dense_labels"]
 
       seconds_per_batch = time.time() - batch_start_time
-      examples_per_second = labels.shape[0] / seconds_per_batch
+      examples_per_second = dense_labels.shape[0] / seconds_per_batch
 
-      hit_at_one = eval_util.calculate_hit_at_one(predictions, labels)
+      hit_at_one = eval_util.calculate_hit_at_one(predictions, dense_labels)
       perr = eval_util.calculate_precision_at_equal_recall_rate(predictions,
-                                                                labels)
-      gap = eval_util.calculate_gap(predictions, labels)
+                                                                dense_labels)
+      gap = eval_util.calculate_gap(predictions, dense_labels)
 
       log_info_str, log_info = "", {
           "Training step": global_step,
