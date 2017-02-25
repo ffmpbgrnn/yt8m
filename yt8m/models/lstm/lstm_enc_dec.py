@@ -51,11 +51,12 @@ class LSTMEncDec(models.BaseModel):
                    for i in xrange(len(dec_input_lists) - 1)]
     dec_targets += [tf.zeros_like(dec_input_lists[0])]
     # enc_outputs_lists = tf.split(enc_outputs, num_or_size_splits=self.max_steps, axis=1)
-    dec_outputs, _ = attn.attention_decoder(
+    dec_outputs, _ = attn.embedding_attention_decoder(
         dec_input_lists, initial_state=enc_state,
         attention_states=enc_outputs,
         cell=dec_cell, output_size=vocab_size,
-        dtype=tf.float32)
+        output_projection=None, feed_previous=False,
+        dtype=tf.float32, scope="LSTMEncDec")
     loss = seq2seq_lib.sequence_loss(
         dec_outputs, dec_targets, dec_weights,
         softmax_loss_function=None)
