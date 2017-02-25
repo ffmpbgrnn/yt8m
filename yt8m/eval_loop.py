@@ -1,4 +1,5 @@
 import time
+import numpy as np
 
 import tensorflow as tf
 from tensorflow import logging
@@ -25,6 +26,22 @@ def restore(saver, sess, train_dir):
                   "(same as the previous one).", global_step_val)
     return global_step_val
 
+def transform_preds(predictions):
+  eos_id = self.num_classes + 2
+  batch_size = predictions.shape[0]
+  vec_size = predictions.shape[2]
+  max_seq_length = 10
+  valid_matrix = np.zeros((batch_size, max_seq_length, vec_size), dtype=np.int32)
+  pred_matrix = []
+  for seq_idx, logit in enumerate(predictions):
+    max_pred = np.argmax(logit, axis=1)
+    find_eos = np.where(max_pred != eos_id)[0]
+    valid_matrix[find_eos, seq_idx] = 1
+    pred_matrix.append(np.expand_dims(predictions, axis=1))
+  pred_matrix = np.concatenate(pred_matrix, axis=1)
+  preds = pred_matrix * valid_matrix
+  preds = np.mean(preds, axis=1)
+  return preds
 
 def evaluation_loop(self, saver, model_ckpt_path):
   global_step_val = model_ckpt_path.split("/")[-1].split("-")[-1]
@@ -60,7 +77,8 @@ def evaluation_loop(self, saver, model_ckpt_path):
         examples_processed += res["predictions"].shape[0]
 
         iteration_info_dict = evl_metrics.accumulate(
-            res["predictions"], res["dense_labels"], res["loss"])
+            transform_preds(self, res["predictions"]),
+            res["dense_labels"], res["loss"])
         iteration_info_dict["examples_per_second"] = example_per_second
 
         iterinfo = utils.AddGlobalStepSummary(
