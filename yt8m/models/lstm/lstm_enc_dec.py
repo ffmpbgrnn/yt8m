@@ -39,6 +39,7 @@ class LSTMEncDec(models.BaseModel):
     dec_cell = self.get_dec_cell(self.cell_size)
     runtime_batch_size = tf.shape(model_inputs)[0]
 
+    # TODO
     if False:
       with tf.variable_scope("Enc"):
         enc_init_state = enc_cell.zero_state(runtime_batch_size, dtype=tf.float32)
@@ -73,7 +74,8 @@ class LSTMEncDec(models.BaseModel):
     logits = logits[:, :vocab_size]
     # logits = tf.nn.sigmoid(enc_outputs[:, -1, :])
     return {
-        "predictions": logits,
+        "predictions": dec_outputs,
+        # "predictions": logits,
         "loss": loss,
     }
 
@@ -88,7 +90,18 @@ class LSTMEncDec(models.BaseModel):
 
   def get_dec_cell(self, cell_size):
     cell = core_rnn_cell.GRUCell(cell_size)
-    if self.phase_train:
-      cell = core_rnn_cell.DropoutWrapper(
-          cell, input_keep_prob=0.5, output_keep_prob=0.5)
+    # TODO
+    if True:
+      num_layers = 2
+      if self.phase_train:
+        cell = core_rnn_cell.DropoutWrapper(
+            cell, input_keep_prob=0.5)
+      cell = core_rnn_cell.MultiRNNCell([cell] * num_layers)
+      if self.phase_train:
+        cell = core_rnn_cell.DropoutWrapper(
+            cell, output_keep_prob=0.5)
+    else:
+      if self.phase_train:
+        cell = core_rnn_cell.DropoutWrapper(
+            cell, input_keep_prob=0.5, output_keep_prob=0.5)
     return cell

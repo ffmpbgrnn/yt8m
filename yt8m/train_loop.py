@@ -34,6 +34,8 @@ def train_loop(self, start_supervisor_services=True):
 
       global_step = res["global_step"]
       predictions = res["predictions"]
+      if type(predictions) == list:
+        predictions = eval_util.transform_preds(self, predictions)
       dense_labels = res["dense_labels"]
 
       seconds_per_batch = time.time() - batch_start_time

@@ -48,8 +48,9 @@ class BaseConfig(object):
     model_names = [
         "FrameLevelLogisticModel",
         "LSTMEncoder",
+        "LSTMEncDec",
     ]
-    self.model_name = "LSTMEncoder"
+    self.model_name = "LSTMEncDec"
 
     self.label_loss = "CrossEntropyLoss"
 
@@ -78,4 +79,5 @@ class BaseConfig(object):
       self.phase_train = False
       data_pattern_str = "validate" if self.stage == "eval" else "test"
 
-    self.data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(data_pattern_str)
+    self.data_pattern = "/data/state/linchao/YT/{0}/{0}*.tfrecord".format(data_pattern_str)
+    # self.data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(data_pattern_str)
