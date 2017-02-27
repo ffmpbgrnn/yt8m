@@ -16,8 +16,6 @@
 import datetime
 import numpy
 
-from tensorflow.python.platform import gfile
-
 from . import mean_average_precision_calculator as map_calculator
 from . import average_precision_calculator as ap_calculator
 
