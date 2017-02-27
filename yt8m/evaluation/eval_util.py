@@ -15,6 +15,8 @@
 """Provides functions to help with evaluating models."""
 import datetime
 import numpy
+import time
+import numpy as np
 
 from . import mean_average_precision_calculator as map_calculator
 from . import average_precision_calculator as ap_calculator
@@ -219,3 +221,40 @@ class EvaluationMetrics(object):
     self.map_calculator.clear()
     self.global_ap_calculator.clear()
     self.num_examples = 0
+
+def transform_preds_mean(self, predictions):
+  s = time.time()
+  eos_id = self.num_classes + 2
+  batch_size = predictions[0].shape[0]
+  vec_size = predictions[0].shape[1]
+  # max_seq_length = 10
+  # valid_matrix = np.zeros((batch_size, max_seq_length, vec_size), dtype=np.int32)
+  # pred_matrix = []
+  preds = np.zeros((batch_size, vec_size), dtype=np.int32)
+  cnts = np.zeros((batch_size, 1), dtype=np.int32)
+  for seq_idx, logit in enumerate(predictions):
+    max_pred = np.argmax(logit, axis=1)
+    find_eos = np.where(max_pred != eos_id)[0]
+    preds[find_eos, :] = preds[find_eos, :] + logit[find_eos, :]
+    cnts[find_eos, :] = cnts[find_eos, :] + 1
+    # valid_matrix[find_eos, seq_idx] = 1
+    # pred_matrix.append(np.expand_dims(logit, axis=1))
+  preds = preds / cnts
+  # pred_matrix = np.concatenate(pred_matrix, axis=1)
+  # preds = pred_matrix * valid_matrix
+  # preds = np.mean(preds, axis=1)
+  print(time.time() - s)
+  return preds[:, :self.num_classes]
+
+def transform_preds(self, predictions):
+  s = time.time()
+  eos_id = self.num_classes + 2
+  batch_size = predictions[0].shape[0]
+  vec_size = predictions[0].shape[1]
+  preds = np.zeros((batch_size, vec_size), dtype=np.int32)
+  for seq_idx, logit in enumerate(predictions):
+    max_pred = np.argmax(logit, axis=1)
+    find_eos = np.where(max_pred != eos_id)[0]
+    preds[find_eos, :] = np.maximum(preds[find_eos, :], logit[find_eos, :])
+  print(time.time() - s)
+  return preds[:, :self.num_classes]
