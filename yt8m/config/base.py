@@ -33,10 +33,10 @@ class BaseConfig(object):
         "LSTMEncDec",
         "LogisticModel",
     ]
-    # self.model_name = "LogisticModel"
-    # self.use_frame_features = False
-    self.model_name = "LSTMEncDec"
-    self.use_frame_features = True
+    self.model_name = "LogisticModel"
+    self.use_frame_features = False
+    # self.model_name = "LSTMEncDec"
+    # self.use_frame_features = True
     if self.use_frame_features:
       self.feature_names = "rgb, audio"
     else:
