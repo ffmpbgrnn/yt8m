@@ -256,5 +256,4 @@ def transform_preds(self, predictions):
     max_pred = np.argmax(logit, axis=1)
     find_eos = np.where(max_pred != eos_id)[0]
     preds[find_eos, :] = np.maximum(preds[find_eos, :], logit[find_eos, :])
-  print(time.time() - s)
   return preds[:, :self.num_classes]

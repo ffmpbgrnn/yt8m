@@ -33,16 +33,15 @@ class BaseConfig(object):
         "LSTMEncDec",
         "LogisticModel",
     ]
-    self.model_name = "LogisticModel"
-    self.use_frame_features = False
+    # self.model_name = "LogisticModel"
+    # self.use_frame_features = False
+    self.model_name = "LSTMEncDec"
+    self.use_frame_features = True
     if self.use_frame_features:
-      self.feature_names = "rgb"
-      self.feature_sizes = "1024"
-      # self.feature_names = "rgb, audio"
-      # self.feature_sizes = "1024, 128"
+      self.feature_names = "rgb, audio"
     else:
-      self.feature_names = "mean_rgb"
-      self.feature_sizes = "1024"
+      self.feature_names = "mean_rgb, mean_audio"
+    self.feature_sizes = "1024, 128"
 
     self.stage = stage
     self.input_setup()
@@ -66,8 +65,7 @@ class BaseConfig(object):
 
   def input_setup(self):
     train_dir = "/data/D2DCRC/linchao/YT/log/"
-    code_saver_dir = "/data/uts221/linchao/yt8m_src_log"
-    # code_saver_dir = "/data/uts711/linchao/yt8m_src_log"
+    code_saver_dir = "/data/state/linchao/yt8m_src_log"
     if self.stage == "train":
       self.phase_train = True
       data_pattern_str = "train"
@@ -85,7 +83,6 @@ class BaseConfig(object):
       data_pattern_str = "validate" if self.stage == "eval" else "test"
 
     if self.use_frame_features:
-      self.data_pattern = "/data/state/linchao/YT/{0}/{0}*.tfrecord".format(data_pattern_str)
-      # self.data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(data_pattern_str)
+      self.data_pattern = "/data/state/linchao/YT/frame/{0}/{0}*.tfrecord".format(data_pattern_str)
     else:
-      self.data_pattern = "/data/uts221/linchao/YT/video_level/{0}/{0}*.tfrecord".format(data_pattern_str)
+      self.data_pattern = "/data/state/linchao/YT/video/{0}/{0}*.tfrecord".format(data_pattern_str)

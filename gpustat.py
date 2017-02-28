@@ -53,7 +53,7 @@ def main(hostname):
   }
   prior = -1
   gpu_idx = -1
-  for i in get_available_gpu(gpu_list):
+  for i in get_available_gpu(gpu_id_mapping, gpu_list):
     i = int(i)
     p = gpu_priors[i]
     if p > prior:
@@ -64,7 +64,7 @@ def main(hostname):
   else:
     print("No available GPU")
 
-def get_available_gpu(stats):
+def get_available_gpu(gpu_id_mapping, stats):
   gpus = []
   for gpu in stats:
     if 1. * int(gpu['memory.used']) < 200 and int(gpu['temperature.gpu']) < 70:
