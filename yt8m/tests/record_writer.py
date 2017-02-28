@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 import cPickle as pkl
 
 import h5py
@@ -48,24 +49,29 @@ def write():
         d.tostring(), [1, 2], video_id="asf")
     tfrecord_writer.write(example.SerializeToString())
 
-def write_from_hdfs():
+def write_from_hdfs(split_id):
   train_vid_to_labels = pkl.load(open("/data/D2DCRC/linchao/YT/train_vid_to_labels.pkl"))
-  split_id = ""
   fin = h5py.File("/data/D2DCRC/linchao/YT/vlad_feas_256_256_nonorm/train/feas_{0}.h5".format(split_id))
   vids = fin.keys()
   writer_counter = 0
-  for vid in vids:
+  tfrecord_writer = None
+  for i, vid in enumerate(vids):
+    print(i, vid)
     data = fin[vid].value
     data = np.array(data, dtype=np.float16)
     labels = [int(_) for _ in train_vid_to_labels[vid]]
     example = matrix_to_tfexample(
-        data.tostring(), labels, video_id=vid)
+        data.tostring(), labels, video_id=str(vid))
     if writer_counter % 1200 == 0:
+      if tfrecord_writer is not None:
+        tfrecord_writer.close()
       shard_id = int(writer_counter / 1200)
-      tfrecord_writer = tf.python_io.TFRecordWriter("/data/D2DCRC/linchao/YT/vlad_feas_256_256_nonorm/train_tfrecord/train_{0}_{1}.tfrecord".format(split_id, shard_id))
+      # /data/D2DCRC/linchao/YT/vlad_feas_256_256_nonorm/train_tfrecord
+      tfrecord_writer = tf.python_io.TFRecordWriter("/data/uts711/linchao/vlad_feas_256_256_nonorm/train_tfrecord/train_{0}_{1}.tfrecord".format(split_id, shard_id))
     tfrecord_writer.write(example.SerializeToString())
     writer_counter += 1
 
+write_from_hdfs(sys.argv[1])
 
 def read(output_filename):
   files = gfile.Glob(output_filename)
