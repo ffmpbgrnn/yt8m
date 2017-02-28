@@ -123,8 +123,8 @@ class YT8MAggregatedFeatureReader(BaseReader):
     labels.set_shape([None, self.num_classes])
     concatenated_features = tf.concat([
         features[feature_name] for feature_name in self.feature_names], 1)
-
-    return features["video_id"], concatenated_features, labels, tf.ones([tf.shape(serialized_examples)[0]])
+    sparse_labels, weights = labels, labels
+    return features["video_id"], concatenated_features, labels, sparse_labels, tf.ones([tf.shape(serialized_examples)[0]]), weights
 
 class YT8MFrameFeatureReader(BaseReader):
   """Reads TFRecords of SequenceExamples.

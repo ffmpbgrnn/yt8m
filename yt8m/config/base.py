@@ -27,6 +27,23 @@ def execute_shell(cmds, wait=True):
 
 class BaseConfig(object):
   def __init__(self, stage):
+    model_names = [
+        "FrameLevelLogisticModel",
+        "LSTMEncoder",
+        "LSTMEncDec",
+        "LogisticModel",
+    ]
+    self.model_name = "LogisticModel"
+    self.use_frame_features = False
+    if self.use_frame_features:
+      self.feature_names = "rgb"
+      self.feature_sizes = "1024"
+      # self.feature_names = "rgb, audio"
+      # self.feature_sizes = "1024, 128"
+    else:
+      self.feature_names = "mean_rgb"
+      self.feature_sizes = "1024"
+
     self.stage = stage
     self.input_setup()
 
@@ -39,22 +56,9 @@ class BaseConfig(object):
       self.num_epochs = 1
       self.batch_size = 512
 
-    self.feature_names = "rgb"
-    self.feature_sizes = "1024"
-    # self.feature_names = "rgb, audio"
-    # self.feature_sizes = "1024, 128"
-    self.use_frame_features = True
-
-    model_names = [
-        "FrameLevelLogisticModel",
-        "LSTMEncoder",
-        "LSTMEncDec",
-    ]
-    self.model_name = "LSTMEncDec"
-
     self.label_loss = "CrossEntropyLoss"
 
-    self.regularization_penalty = 1e-5
+    self.regularization_penalty = 1
 
     self.start_new_model = False
     self.top_k = 20
@@ -62,7 +66,8 @@ class BaseConfig(object):
 
   def input_setup(self):
     train_dir = "/data/D2DCRC/linchao/YT/log/"
-    code_saver_dir = "/data/uts711/linchao/yt8m_src_log"
+    code_saver_dir = "/data/uts221/linchao/yt8m_src_log"
+    # code_saver_dir = "/data/uts711/linchao/yt8m_src_log"
     if self.stage == "train":
       self.phase_train = True
       data_pattern_str = "train"
@@ -79,5 +84,8 @@ class BaseConfig(object):
       self.phase_train = False
       data_pattern_str = "validate" if self.stage == "eval" else "test"
 
-    self.data_pattern = "/data/state/linchao/YT/{0}/{0}*.tfrecord".format(data_pattern_str)
-    # self.data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(data_pattern_str)
+    if self.use_frame_features:
+      self.data_pattern = "/data/state/linchao/YT/{0}/{0}*.tfrecord".format(data_pattern_str)
+      # self.data_pattern = "/data/uts700/linchao/yt8m/data/{0}/{0}*.tfrecord".format(data_pattern_str)
+    else:
+      self.data_pattern = "/data/uts221/linchao/YT/video_level/{0}/{0}*.tfrecord".format(data_pattern_str)

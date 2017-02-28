@@ -87,6 +87,9 @@ def get_train_op(self, opt, result, label_loss):
     reg_loss = result["regularization_loss"]
   else:
     reg_loss = tf.constant(0.0)
+  reg_losses = tf.losses.get_regularization_losses()
+  if reg_losses:
+    reg_loss += tf.add_n(reg_losses)
   if self.config.regularization_penalty != 0:
     tf.summary.scalar("reg_loss", reg_loss)
 
