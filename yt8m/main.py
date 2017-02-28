@@ -89,7 +89,7 @@ class Expr(object):
             data,
             batch_size=self.batch_size,
             capacity=self.batch_size * 10,
-            min_after_dequeue=self.batch_size,
+            min_after_dequeue=self.batch_size * 5,
             allow_smaller_final_batch=True,
             enqueue_many=True)
       else:

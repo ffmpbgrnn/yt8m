@@ -35,7 +35,9 @@ def evaluation_loop(self, saver, model_ckpt_path):
       # self.train_dir, graph=tf.get_default_graph())
   summary_writer = None
 
-  with tf.Session() as sess:
+  sess_config = tf.ConfigProto()
+  sess_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+  with tf.Session(config=sess_config) as sess:
     saver.restore(sess, model_ckpt_path)
     sess.run([tf.local_variables_initializer()])
 
