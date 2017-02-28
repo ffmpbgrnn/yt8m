@@ -81,4 +81,5 @@ def check_temp():
 
 
 if __name__ == '__main__':
+  hostname = sys.argv[1]
   main(hostname)

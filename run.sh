@@ -1,7 +1,10 @@
 #!/bin/bash
 
-source ~/tf/whl/tmp/bin/activate;
-gpu_id=`python gpustat.py`
+#source ~/tf/whl/tmp/bin/activate;
+source /home/linchao/tf/whl/02.25.2017_py2/bin/activate;
+hostname=`hostname`
+echo "Running on $hostname"
+gpu_id=`python gpustat.py $hostname`
 export CUDA_VISIBLE_DEVICES=$gpu_id;
 echo "Using GPU $CUDA_VISIBLE_DEVICES"
 
