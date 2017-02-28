@@ -8,13 +8,26 @@ import time
 
 # Ordered by Priority
 GPU_names = ['GeForce GTX TITAN X', 'GeForce GTX 1080', 'GeForce GTX 980 Ti', 'Tesla K40c', 'TITAN X (Pascal)']
-gpu_id_mapping = {
-    0: 3,
-    1: 0,
-    2: 1,
-    3: 2
-}
-def main():
+
+def main(hostname):
+  if hostname == "UTS7":
+    gpu_id_mapping = {
+        0: 3,
+        1: 0,
+        2: 1,
+        3: 2,}
+  elif hostname == "UTS2":
+    gpu_id_mapping = {
+        0: 3,
+        1: 2,
+        2: 1,
+        3: 0,}
+  elif hostname == "UTS6":
+    gpu_id_mapping = {
+        0: 3,
+        1: 2,
+        2: 1,
+        3: 0,}
   gpu_query_columns = ('index', 'uuid', 'name', 'temperature.gpu',
                         'utilization.gpu', 'memory.used', 'memory.total')
 
@@ -34,7 +47,7 @@ def main():
 
   gpu_priors = {
       0: 5,
-      1: 1,
+      1: 5,
       2: 5,
       3: 5,
   }
@@ -68,4 +81,4 @@ def check_temp():
 
 
 if __name__ == '__main__':
-  main()
+  main(hostname)
