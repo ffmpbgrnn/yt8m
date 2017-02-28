@@ -27,7 +27,7 @@ from . import video_level_models
 
 class FrameLevelLogisticModel(models.BaseModel):
 
-  def create_model(self, model_input, vocab_size, num_frames, **unused_params):
+  def create_model(self, model_input, vocab_size, num_frames, l2_penalty=1e-8, **unused_params):
     """Creates a model which uses a logistic classifier over the average of the
     frame-level features.
 
@@ -57,7 +57,7 @@ class FrameLevelLogisticModel(models.BaseModel):
 
     output = slim.fully_connected(
         avg_pooled, vocab_size, activation_fn=tf.nn.sigmoid,
-        weights_regularizer=slim.l2_regularizer(0.01))
+        weights_regularizer=slim.l2_regularizer(l2_penalty))
     return {"predictions": output}
 
 
