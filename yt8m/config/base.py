@@ -51,7 +51,7 @@ class BaseConfig(object):
       self.num_epochs = None
       if self.model_name == "LogisticModel":
         self.num_epochs = 5
-      self.batch_size = 128
+      self.batch_size = 256
     else:
       self.num_readers = 1
       self.num_epochs = 1
@@ -79,7 +79,7 @@ class BaseConfig(object):
       pwd = os.path.dirname(os.path.abspath(__file__))
       # execute_shell("git checkout -b {}; git commit -v -a -m 'model id: {}'".format(
           # self.run_id, self.run_id))
-      execute_shell("cd {0}/../../../ && tar cf src.tar src/ && cp src.tar {1}")
+      execute_shell("cd {0}/../../../ && tar cf src.tar src/ && cp src.tar {1}".format(pwd, code_saver_dir))
       # execute_shell("cp -ar {0}/../../../src {1}".format(
           # pwd, os.path.join(code_saver_dir)))
     elif self.stage == "eval" or self.stage == "inference":
