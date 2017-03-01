@@ -42,8 +42,9 @@ def eval_local():
           if not model_has_evaludated:
             break
     if next_model_id is not None:
-      if not os.path.exists(os.path.join(train_dir, src)):
-        os.system("ssh uts_cluster 'cd {}; tar xf src.tar'".format(train_dir))
+      if not os.path.exists(os.path.join(train_dir, 'src')):
+        print("ssh uts_cluster 'cd /projects/D2DCRC/linchaoz/YT/log/{}; tar xf src.tar'".format(run_id))
+        os.system("ssh uts_cluster 'cd /projects/D2DCRC/linchaoz/YT/log/{}; tar xf src.tar'".format(run_id))
       cmd = "cd {2}/src/; ./run.sh eval {0}/model.ckpt-{1} > {0}/model.ckpt-{1}.validate.log 2>&1".format(train_dir, next_model_id, code_dir)
       print(cmd)
       # try:
