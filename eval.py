@@ -43,8 +43,8 @@ def eval_local():
             break
     if next_model_id is not None:
       if not os.path.exists(os.path.join(train_dir, src)):
-        os.system("ssh uts_cluster 'cd /home/linczhu/yt/log/{0}; tar xf src.tar'".format(run_id))
-      cmd = "cd {2}/src/; ./run.sh eval /data/D2DCRC/linchao/YT/log/{0}/model.ckpt-{1} > /data/D2DCRC/linchao/YT/log/{0}/model.ckpt-{1}.validate.log 2>&1".format(run_id, next_model_id, code_dir)
+        os.system("ssh uts_cluster 'cd {}; tar xf src.tar'".format(train_dir))
+      cmd = "cd {2}/src/; ./run.sh eval {0}/model.ckpt-{1} > {0}/model.ckpt-{1}.validate.log 2>&1".format(train_dir, next_model_id, code_dir)
       print(cmd)
       # try:
       if True:
@@ -92,13 +92,13 @@ def eval_remote():
   # for server_id in [2, 6, 7]:
   for server_id in [6, 7]:
     try:
-      output = subprocess.check_output("ssh uts{0} 'python2.7 /data/uts700/linchao/yt8m/YT/src/gpustat.py UTS{0} eval'".format(server_id), shell=True).strip()
+      output = subprocess.check_output("ssh uts{0} 'python2.7 {1}/gpustat.py UTS{0} eval'".format(server_id, src_dir), shell=True).strip()
       gpu_id = int(output)
       docker_flags = "-v /data:/data -v /home/linchao/docker/docker_home/:/home/linchao --user linchao -w /home/linchao -d linchao /bin/zsh -c"
-      task_cmd = 'cd /data/uts700/linchao/yt8m/YT/src && python2.7 eval.py eval_local {}'.format(run_id)
+      task_cmd = 'cd {} && python2.7 eval.py eval_local {}'.format(src_dir, run_id)
       cmd = '''echo "nvidia-docker run -h UTS{0} {1} '{2}'" | ssh uts{0} /bin/zsh -'''.format(server_id, docker_flags, task_cmd)
       print(cmd)
-      # os.system(cmd)
+      os.system(cmd)
       break
     except:
       pass
@@ -106,6 +106,7 @@ def eval_remote():
 run_id = sys.argv[2]
 train_dir = "/data/D2DCRC/linchao/YT/log/{}".format(run_id)
 code_dir = "/data/D2DCRC/linchao/YT/log/{}".format(run_id)
+src_dir = "/data/uts700/linchao/yt8m/YT/src"
 if sys.argv[1] == "eval_local":
   eval_local()
 elif sys.argv[1] == "get_score":
