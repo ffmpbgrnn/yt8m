@@ -15,7 +15,7 @@ def train_loop(self, start_supervisor_services=True):
                            is_chief=self.is_chief,
                            global_step=self.global_step,
                            save_model_secs=600,
-                           save_summaries_secs=60,
+                           save_summaries_secs=600,
                            saver=saver)
   sess = sv.prepare_or_wait_for_session(
       self.master,
@@ -26,6 +26,7 @@ def train_loop(self, start_supervisor_services=True):
   sv.start_queue_runners(sess)
   logging.info("started queue runners")
 
+  log_fout = open(os.path.join(self.config.train_dir, "train.log"), "w")
   try:
     logging.info("entering training loop")
     while not sv.should_stop():
@@ -53,10 +54,13 @@ def train_loop(self, start_supervisor_services=True):
           "GAP": gap,
           "Loss": res["loss"],
           "Global norm": res["global_norm"],
+          "Exps/sec": examples_per_second,
       }
       for k, v in log_info.iteritems():
-        log_info_str += "%s: %.2f;\t" % (k, v)
+        log_info_str += "%s: %.2f;  " % (k, v)
       logging.info(log_info_str)
+      log_fout.write(log_info_str+'\n')
+      if global_step % 100 == 0: log_fout.flush()
       if self.is_chief and global_step % 10 == 0 and self.config.train_dir:
         sv.summary_writer.add_summary(
             utils.MakeSummary("model/Training_Hit@1",
