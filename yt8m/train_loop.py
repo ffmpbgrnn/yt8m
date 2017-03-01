@@ -96,14 +96,15 @@ def get_train_op(self, opt, result, label_loss):
   update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
   if "update_ops" in result.keys():
     update_ops += result["update_ops"]
+
+  final_loss = self.config.regularization_penalty * reg_loss + label_loss
   if update_ops:
     with tf.control_dependencies(update_ops):
       barrier = tf.no_op(name="gradient_barrier")
       with tf.control_dependencies([barrier]):
-        label_loss = tf.identity(label_loss)
+        final_loss = tf.identity(final_loss)
 
   # Incorporate the L2 weight penalties etc.
-  final_loss = self.config.regularization_penalty * reg_loss + label_loss
   # train_op = optimizer.minimize(final_loss, global_step=global_step)
   params = tf.trainable_variables()
   gradients = tf.gradients(final_loss, params)
