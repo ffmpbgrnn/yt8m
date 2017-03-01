@@ -1,12 +1,9 @@
 #!/bin/bash
 
 #source ~/tf/whl/tmp/bin/activate;
-source /home/linchao/tf/whl/02.25.2017_py2/bin/activate;
+
 hostname=`hostname`
 echo "Running on $hostname"
-gpu_id=`python gpustat.py $hostname`
-export CUDA_VISIBLE_DEVICES=$gpu_id;
-echo "Using GPU $CUDA_VISIBLE_DEVICES"
 
 stage=$1
 case $stage in
@@ -16,7 +13,11 @@ case $stage in
         model_ckpt_path=$2
 esac
 
-python -m yt8m.main \
+gpu_id=`python gpustat.py $hostname $stage`
+export CUDA_VISIBLE_DEVICES=$gpu_id;
+echo "Using GPU $CUDA_VISIBLE_DEVICES"
+
+source /home/linchao/tf/whl/02.25.2017_py2/bin/activate; python -m yt8m.main \
     --stage=$stage \
     --model_ckpt_path=$model_ckpt_path \
     --config_name="BaseConfig"

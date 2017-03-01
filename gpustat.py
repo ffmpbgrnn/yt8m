@@ -9,7 +9,7 @@ import time
 # Ordered by Priority
 GPU_names = ['GeForce GTX TITAN X', 'GeForce GTX 1080', 'GeForce GTX 980 Ti', 'Tesla K40c', 'TITAN X (Pascal)']
 
-def main(hostname):
+def main(hostname, mem_percent):
   if hostname == "UTS7":
     gpu_id_mapping = {
         0: 3,
@@ -53,7 +53,7 @@ def main(hostname):
   }
   prior = -1
   gpu_idx = -1
-  for i in get_available_gpu(gpu_id_mapping, gpu_list):
+  for i in get_available_gpu(gpu_id_mapping, gpu_list, mem_percent):
     i = int(i)
     p = gpu_priors[i]
     if p > prior:
@@ -64,10 +64,11 @@ def main(hostname):
   else:
     print("No available GPU")
 
-def get_available_gpu(gpu_id_mapping, stats):
+def get_available_gpu(gpu_id_mapping, stats, mem_percent):
   gpus = []
   for gpu in stats:
-    if 1. * int(gpu['memory.used']) < 200 and int(gpu['temperature.gpu']) < 70:
+    estimate_memory = int(int(gpu['memory.total']) * mem_percent)
+    if 1. * int(gpu['memory.used']) < estimate_memory and int(gpu['temperature.gpu']) < 70:
       gpu_id = int(gpu['index'])
       gpus.append(gpu_id_mapping[gpu_id])
   return gpus
@@ -82,4 +83,8 @@ def check_temp():
 
 if __name__ == '__main__':
   hostname = sys.argv[1]
-  main(hostname)
+  if sys.argv[2] == "train":
+    mem_percent = 0.9
+  else:
+    mem_percent = 0.5
+  main(hostname, mem_percent)

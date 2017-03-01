@@ -221,7 +221,8 @@ class YT8MFrameFeatureReader(BaseReader):
         })
 
     def sort_and_pad(x):
-      x = np.sort(x)
+      # TODO
+      x = np.sort(x)[::-1]
       x = x.tolist()
       w = np.ones((self.num_max_labels), dtype=np.int64)
       w[-1] = 0

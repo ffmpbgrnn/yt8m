@@ -22,7 +22,7 @@ class LSTMEncDec(models.BaseModel):
     self.base_learning_rate = 3e-4
 
     self.cell_size = 1024
-    self.max_steps = 30
+    self.max_steps = 150
     self.num_max_labels = 10
 
   def create_model(self, model_input, vocab_size, num_frames,
@@ -93,13 +93,17 @@ class LSTMEncDec(models.BaseModel):
     # TODO
     if True:
       num_layers = 2
+      '''
       if self.phase_train:
         cell = core_rnn_cell.DropoutWrapper(
             cell, input_keep_prob=0.5)
+      '''
       cell = core_rnn_cell.MultiRNNCell([cell] * num_layers)
+      '''
       if self.phase_train:
         cell = core_rnn_cell.DropoutWrapper(
             cell, output_keep_prob=0.5)
+      '''
     else:
       if self.phase_train:
         cell = core_rnn_cell.DropoutWrapper(
