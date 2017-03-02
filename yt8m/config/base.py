@@ -34,7 +34,7 @@ class BaseConfig(object):
         "LogisticModel",
     ]
     self.model_name = "LogisticModel"
-    self.input_feat_type = "video"
+    self.input_feat_type = "vlad"
     # self.model_name = "LSTMEncDec"
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"

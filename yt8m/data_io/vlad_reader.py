@@ -1,5 +1,5 @@
 import tensorflow as tf
-from reader import BaseReader
+from .readers import BaseReader
 
 
 class YT8MVLADFeatureReader(BaseReader):
@@ -17,7 +17,7 @@ class YT8MVLADFeatureReader(BaseReader):
 
   def prepare_reader(self, filename_queue):
     reader = tf.TFRecordReader()
-    _, serialized_examples = reader.read_up_to(filename_queue)
+    _, serialized_examples = reader.read(filename_queue)
 
     # set the mapping from the fields to data types in the proto
     num_features = len(self.feature_names)
@@ -34,9 +34,22 @@ class YT8MVLADFeatureReader(BaseReader):
 
     features = tf.parse_single_example(serialized_examples, features=feature_map)
 
-    concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [1, -1])
+    concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [65536])
 
-    labels = tf.sparse_to_indicator(features["labels"], self.num_classes)
-    labels.set_shape([None, self.num_classes])
-    sparse_labels, weights = labels, labels
-    return features["video_id"], concatenated_features, labels, sparse_labels, tf.ones([tf.shape(serialized_examples)[0]]), weights
+    sparse_labels = features["labels"].values
+    dense_labels = (tf.cast(
+        tf.sparse_to_dense(sparse_labels, (self.num_classes,), 1,
+            validate_indices=False),
+        tf.bool))
+    sparse_labels = dense_labels
+    weights = dense_labels
+    num_frames = tf.ones([1])
+
+    batch_video_ids = tf.expand_dims(features["video_id"], 0)
+    batch_video_matrix = tf.expand_dims(concatenated_features, 0)
+    batch_dense_labels = tf.expand_dims(dense_labels, 0)
+    batch_sparse_labels = tf.expand_dims(sparse_labels, 0)
+    batch_label_weights = tf.expand_dims(weights, 0)
+    batch_frames = tf.expand_dims(num_frames, 0)
+
+    return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, batch_frames, batch_label_weights
