@@ -25,7 +25,7 @@ class LogisticModel(models.BaseModel):
   """Logistic model with L2 regularization."""
 
   def create_model(self, model_input, vocab_size, l2_penalty=1e-8,
-                   label_smoothing=False, **unused_params):
+                   label_smoothing=False, is_training=True, dense_labels=None, **unused_params):
     """Creates a logistic model.
 
     Args:
@@ -48,14 +48,23 @@ class LogisticModel(models.BaseModel):
         output, vocab_size, activation_fn=tf.nn.sigmoid,
         weights_regularizer=slim.l2_regularizer(l2_penalty))
     '''
-    if label_smoothing:
-      act_fn = tf.nn.softmax
-    else:
-      act_fn = tf.nn.sigmoid
-    output = slim.fully_connected(
-        model_input, vocab_size, activation_fn=act_fn,
+
+    logits = slim.fully_connected(
+        model_input, vocab_size, activation_fn=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty))
-    return {"predictions": output}
+    labels = tf.cast(dense_labels, tf.float32)
+    labels = labels / tf.reduce_sum(labels, axis=1, keep_dims=True)
+    if label_smoothing:
+      loss = tf.nn.softmax_cross_entropy_with_logits(logits, labels)
+    else:
+      loss = tf.nn.sigmoid_cross_entropy_with_logits(logits, labels)
+    loss = tf.reduce_mean(loss)
+    if not is_training:
+      if label_smoothing:
+        logits = tf.nn.softmax(logits)
+      else:
+        logits = tf.nn.sigmoid(logits)
+    return {"predictions": logits, "loss": loss}
 
 class MoeConfig(object):
   moe_num_mixtures = 2

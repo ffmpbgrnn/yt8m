@@ -76,8 +76,7 @@ class YT8MAggregatedFeatureReader(BaseReader):
   def __init__(self,
                num_classes=4716,
                feature_sizes=[1024],
-               feature_names=["mean_inc3"],
-               label_smoothing=False):
+               feature_names=["mean_inc3"]):
     """Construct a YT8MAggregatedFeatureReader.
 
     Args:
@@ -93,7 +92,6 @@ class YT8MAggregatedFeatureReader(BaseReader):
     self.num_classes = num_classes
     self.feature_sizes = feature_sizes
     self.feature_names = feature_names
-    self.label_smoothing = label_smoothing
 
   def prepare_reader(self, filename_queue, batch_size=1024):
     """Creates a single reader thread for pre-aggregated YouTube 8M Examples.
@@ -123,9 +121,6 @@ class YT8MAggregatedFeatureReader(BaseReader):
     features = tf.parse_example(serialized_examples, features=feature_map)
     labels = tf.sparse_to_indicator(features["labels"], self.num_classes)
     labels.set_shape([None, self.num_classes])
-    if self.label_smoothing:
-      labels = tf.cast(labels, tf.float32)
-      labels = labels / tf.reduce_sum(labels, axis=1, keep_dims=True)
 
     concatenated_features = tf.concat([
         features[feature_name] for feature_name in self.feature_names], 1)
