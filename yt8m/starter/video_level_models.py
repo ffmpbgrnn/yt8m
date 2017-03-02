@@ -24,7 +24,8 @@ from yt8m.models import models
 class LogisticModel(models.BaseModel):
   """Logistic model with L2 regularization."""
 
-  def create_model(self, model_input, vocab_size, l2_penalty=1e-8, **unused_params):
+  def create_model(self, model_input, vocab_size, l2_penalty=1e-8,
+                   label_smoothing=False, **unused_params):
     """Creates a logistic model.
 
     Args:
@@ -47,8 +48,12 @@ class LogisticModel(models.BaseModel):
         output, vocab_size, activation_fn=tf.nn.sigmoid,
         weights_regularizer=slim.l2_regularizer(l2_penalty))
     '''
+    if label_smoothing:
+      act_fn = tf.nn.softmax
+    else:
+      act_fn = tf.nn.sigmoid
     output = slim.fully_connected(
-        model_input, vocab_size, activation_fn=tf.nn.sigmoid,
+        model_input, vocab_size, activation_fn=act_fn,
         weights_regularizer=slim.l2_regularizer(l2_penalty))
     return {"predictions": output}
 

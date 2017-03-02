@@ -114,7 +114,8 @@ class Expr(object):
     elif self.config.input_feat_type == "video":
       reader = readers.YT8MAggregatedFeatureReader(
           feature_names=feature_names,
-          feature_sizes=feature_sizes)
+          feature_sizes=feature_sizes,
+          label_smoothing=self.config.label_smoothing)
     elif self.config.input_feat_type == "vlad":
       reader = vlad_reader.YT8MVLADFeatureReader(
           feature_names=feature_names,
@@ -146,7 +147,8 @@ class Expr(object):
             dense_labels=dense_labels_batch,
             sparse_labels=sparse_labels_batch,
             label_weights=label_weights_batch,
-            is_training=self.phase_train)
+            is_training=self.phase_train,
+            label_smoothing=self.config.label_smoothing)
 
         predictions = result["predictions"]
         if "loss" in result.keys():
