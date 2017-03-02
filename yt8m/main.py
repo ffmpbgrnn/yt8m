@@ -159,7 +159,10 @@ class Expr(object):
       dense_labels_batch = tf.cast(dense_labels_batch, tf.float32)
 
       if self.stage == "train":
-        opt = self.optimizer(self.model.base_learning_rate)
+        if self.model.optimizer_name == "MomentumOptimizer":
+          opt = self.optimizer(self.model.base_learning_rate, 0.9)
+        else:
+          opt = self.optimizer(self.model.base_learning_rate)
         train_op, label_loss, global_norm = train_loop.get_train_op(self, opt, result, label_loss)
         self.feed_out = {
             "train_op": train_op,

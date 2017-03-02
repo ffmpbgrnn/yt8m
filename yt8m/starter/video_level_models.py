@@ -24,7 +24,7 @@ from yt8m.models import models
 class LogisticModel(models.BaseModel):
   """Logistic model with L2 regularization."""
 
-  def create_model(self, model_input, vocab_size, l2_penalty=1e-8,
+  def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
                    label_smoothing=False, is_training=True, dense_labels=None, **unused_params):
     """Creates a logistic model.
 
@@ -53,18 +53,19 @@ class LogisticModel(models.BaseModel):
         model_input, vocab_size, activation_fn=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty))
     labels = tf.cast(dense_labels, tf.float32)
-    labels = labels / tf.reduce_sum(labels, axis=1, keep_dims=True)
     if label_smoothing:
-      loss = tf.nn.softmax_cross_entropy_with_logits(logits, labels)
+      labels = labels / tf.reduce_sum(labels, axis=1, keep_dims=True)
+      loss = tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits)
+      loss = tf.reduce_mean(loss, 1)
     else:
-      loss = tf.nn.sigmoid_cross_entropy_with_logits(logits, labels)
-    loss = tf.reduce_mean(loss)
-    if not is_training:
-      if label_smoothing:
-        logits = tf.nn.softmax(logits)
-      else:
-        logits = tf.nn.sigmoid(logits)
-    return {"predictions": logits, "loss": loss}
+      print("Using sigmoid")
+      loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+      loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+    if label_smoothing:
+      preds = tf.nn.softmax(logits)
+    else:
+      preds = tf.nn.sigmoid(logits)
+    return {"predictions": preds, "loss": loss}
 
 class MoeConfig(object):
   moe_num_mixtures = 2
