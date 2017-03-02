@@ -1,117 +1,127 @@
 import h5py
+import threading
+import cPickle as pkl
 import random
 import numpy as np
+import Queue
 
 import tensorflow as tf
-
-data = h5py.File("/data/state/linchao/YT/hdfs/video/train/mean.h5", 'r')
-
-num_classes = 4716
-classes = np.arange(num_classes)
-np.random.shuffle(classes)
-
-step_size = num_classes / batch_size
-batch_class = classes[step_size * i: step_size * (i + 1)]
+from tensorflow.python.training import queue_runner
+from . import feeding_queue_runner as fqr
 
 
-def return_identity(placeholders):
-  return placeholders
+class Feed_fn_setup(object):
+  def __init__(self):
+    with open("/data/state/linchao/YT/hdfs/video/train/mean.pkl") as fin:
+      self.vid_list = pkl.load(fin)
+    self.mean_data = h5py.File("/data/state/linchao/YT/hdfs/video/train/mean.h5", 'r')
 
-class Feed_fn():
-  def __init__(self, label_vid_dict, seed):
-    random.seed(seed)
-    self.label_vid_dict = dict(label_vid_dict)
-    self.label_vid_ptr = {}
-    for i in xrange(num_classes):
-      self.label_vid_ptr[i] = 0
+    with open("/data/uts700/linchao/yt8m/YT/data/vid_info/train_vid_to_labels.pkl") as fin:
+      self.vid_to_labels = pkl.load(fin)
+
+    self.label_to_vid_dict = {}
+    for vid, labels in self.vid_to_labels.iteritems():
+      for l in labels:
+        c = self.label_to_vid_dict.get(l, [])
+        c.append(vid)
+        self.label_to_vid_dict[l] = c
+
+    self.num_classes = 4716
+    self.batch_size = 128
+
+    self.batch_id_queue = Queue.Queue(500)
+    bi_threads = [threading.Thread(target=self.input_vid_threads)]
+    bi_threads.start()
 
 
-  def get_next_vid(self, labels):
-    for label in labels:
-    vids = self.label_vid_dict[label]
-    vid_ptr = self.label_vid_ptr[label]
-    vid = vids[vid_ptr]
-    if len(vids) == vid_ptr + 1:
-      self.label_vid_ptr[label] = 0
-      random.shuffle(self.label_vid_dict[label])
-    else:
-      self.label_vid_ptr[label] = vid_ptr + 1
-    return vid
+  def input_vid_threads(self):
+    labels = np.arange(self.num_classes)
+
+    label_vid_ptr = {}
+    for i in xrange(self.num_classes):
+      label_vid_ptr[i] = 0
+
+    # step_size = num_classes / batch_size
+    # batch_labels = classes[step_size * i: step_size * (i + 1)]
+    batch_vids = []
+    while True:
+      np.random.shuffle(labels)
+      for label in labels:
+        vids = self.label_to_vid_dict[label]
+        vid_ptr = label_vid_ptr[label]
+        batch_vids.append(vids[vid_ptr])
+        if len(batch_vids) == self.batch_size:
+          self.batch_id_queue.put(batch_vids)
+          batch_vids = []
+
+        if len(vids) == vid_ptr + 1:
+          label_vid_ptr[label] = 0
+          random.shuffle(self.label_to_vid_dict[label])
+        else:
+          label_vid_ptr[label] = vid_ptr + 1
+
+
+class Feed_fn(object):
+  def __init__(self, info):
+    self._i = info
 
   def __call__(self):
-    if self._num_epochs and self._epoch >= self._num_epochs:
-      raise errors.OutOfRangeError(None, None,
-                                   "Already emitted %s epochs." % self._epoch)
+    vids = self._i.batch_id_queue.get()
+    vid_index = []
+    dense_labels = []
+    for vid in vids:
+      idx = self._i.vid_list.index(vid)
+      vid_index.append(idx)
+      dense_label = np.zeros((1, self._i.num_classes), dtype=np.int64)
+      labels = self._i.vid_to_labels[vid]
+      for l in labels:
+        dense_label[0, l] = 1
+      dense_labels.append(dense_label)
+    dense_labels = np.vstack(dense_labels)
 
-    integer_indexes = [
-        j % self._max for j in range(self._trav, self._trav + self._batch_size)]
+    vid_index = np.array(vid_index)
+    vid_index_sortidx = np.argsort(vid_index)
+    batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
+    batch_data = batch_data[np.argsort(vid_index_sortidx), :]
+    feed_dict = {
+      "video_id": np.array(vids),
+      "labels": dense_labels,
+      "feas": batch_data,
+    }
 
-    shuffle_indexes = False
-    epoch_inc = False
-    if self._epoch_end in integer_indexes:
-      # after this batch we will have processed self._epoch epochs, possibly
-      # overshooting a bit to fill out a batch.
-      epoch_inc = True
-      if self._phase_train:
-        shuffle_indexes = True
-      batch_end_inclusive = integer_indexes.index(self._epoch_end)
-      integer_indexes = integer_indexes[:(batch_end_inclusive+1)]
-      '''
-      if self._epoch + 1 == self._num_epochs:
-        # trim this batch, so as not to overshoot the last epoch.
-        batch_end_inclusive = integer_indexes.index(self._epoch_end)
-        integer_indexes = integer_indexes[:(batch_end_inclusive+1)]
-      '''
-
-    self._trav = (integer_indexes[-1] + 1) % self._max
-    feed_dict = self.get_feed_dict(integer_indexes)
-    if shuffle_indexes:
-      np.random.shuffle(self._ranges)
-    if epoch_inc:
-      self._epoch += 1
     return feed_dict
 
 def enqueue_data(name="enqueue_input", shuffle=True):
-  label_to_vids = {}
-  vid_to_labels = {}
+  fn_setup = Feed_fn_setup()
+  queue_types = [tf.string, tf.int64, tf.float32]
+  queue_shapes = [(), (4716,), (1024+128,)]
+  capacity = 500
+  num_threads = 4
+  batch_size = 128
   with tf.name_scope(name):
-    min_after_dequeue = 0  # just for the summary text
     queue = tf.FIFOQueue(capacity,
-                          dtypes=queue_types,
-                          shapes=queue_shapes)
+                         dtypes=queue_types,
+                         shapes=queue_shapes)
 
     enqueue_ops = []
     feed_fns = []
 
+    def return_identity(placeholders):
+      return placeholders
+
     for i in range(num_threads):
       # Note the placeholders have no shapes, so they will accept any
       # enqueue_size.  enqueue_many below will break them up.
-      placeholders = [tf.placeholder(t) for t in placeholder_types]
+      placeholders = [tf.placeholder(t) for t in queue_types]
       out_ops = return_identity(placeholders)
 
       enqueue_ops.append(queue.enqueue_many(out_ops))
-      feed_fns.append(Feed_fn(placeholders,
-                                  input_,
-                                  enqueue_size,
-                                  random_start=shuffle,
-                                  num_epochs=num_epochs,
-                                  seed=1234 + i,
-                                  extras=extras))
+      feed_fns.append(Feed_fn(fn_setup))
 
     runner = fqr.FeedingQueueRunner(queue=queue,
                                     enqueue_ops=enqueue_ops,
                                     feed_fns=feed_fns)
     queue_runner.add_queue_runner(runner)
 
-    return queue
-
-queue = enqueue_data(
-    input_, queue_feed_fn_name, queue_capacity, shuffle=shuffle, num_threads=num_threads, seed=seed,
-    enqueue_size=1, num_epochs=num_epochs, min_after_dequeue=0,
-    queue_types=queue_types, placeholder_types=placeholder_types, queue_shapes=queue_shapes,
-    _get_ops=_get_ops, extras=extras)
-
-if num_epochs is None:
-  features = queue.dequeue_many(batch_size)
-else:
-  features = queue.dequeue_up_to(batch_size)
+    features = queue.dequeue_many(batch_size)
+  return features
