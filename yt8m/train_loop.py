@@ -9,15 +9,24 @@ import utils
 
 slim = tf.contrib.slim
 
-def train_loop(self, start_supervisor_services=True):
+def train_loop(self, model_ckpt_path, start_supervisor_services=True):
   saver = tf.train.Saver(max_to_keep=1000000)
+
+  init_fn = None
+  if len(model_ckpt_path) > 0:
+    variables_to_restore = tf.all_variables()
+    init_fn = slim.assign_from_checkpoint_fn(
+        "/data/D2DCRC/linchao/YT/log/47/model.ckpt-57601",
+        variables_to_restore,
+        ignore_missing_vars=False,)
 
   sv = tf.train.Supervisor(logdir=self.config.train_dir,
                            is_chief=self.is_chief,
                            global_step=self.global_step,
                            save_model_secs=600,
                            save_summaries_secs=600,
-                           saver=saver)
+                           saver=saver,
+                           init_fn=init_fn)
   sess = sv.prepare_or_wait_for_session(
       self.master,
       start_standard_services=start_supervisor_services,

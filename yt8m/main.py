@@ -63,7 +63,7 @@ class Expr(object):
       eval_saver = tf.train.Saver(tf.global_variables())
 
     if self.stage == "train":
-      train_loop.train_loop(self)
+      train_loop.train_loop(self, self.model_ckpt_path)
     elif self.stage == "eval":
       eval_loop.evaluation_loop(self, eval_saver, self.model_ckpt_path)
     elif self.stage == "inference":
