@@ -34,14 +34,17 @@ class BaseConfig(object):
         "LogisticModel",
     ]
     self.model_name = "LogisticModel"
-    self.use_frame_features = False
+    self.input_feat_type = "video"
     # self.model_name = "LSTMEncDec"
-    # self.use_frame_features = True
-    if self.use_frame_features:
+    if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"
-    else:
+      self.feature_sizes = "1024, 128"
+    elif self.input_feat_type == "video":
       self.feature_names = "mean_rgb, mean_audio"
-    self.feature_sizes = "1024, 128"
+      self.feature_sizes = "1024, 128"
+    elif self.input_feat_type == "vlad":
+      self.feature_names = "feas"
+      self.feature_sizes = "65536"
 
     self.stage = stage
     self.input_setup()
@@ -86,7 +89,5 @@ class BaseConfig(object):
       self.phase_train = False
       data_pattern_str = "validate" if self.stage == "eval" else "test"
 
-    if self.use_frame_features:
-      self.data_pattern = "/data/state/linchao/YT/frame/{0}/{0}*.tfrecord".format(data_pattern_str)
-    else:
-      self.data_pattern = "/data/state/linchao/YT/video/{0}/{0}*.tfrecord".format(data_pattern_str)
+    self.data_pattern = "/data/state/linchao/YT/{0}/{1}/{1}*.tfrecord".format(
+        self.input_feat_type, data_pattern_str)

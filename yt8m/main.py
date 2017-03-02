@@ -10,6 +10,7 @@ from yt8m.starter import video_level_models
 from yt8m.models.lstm import lstm
 from yt8m.models.lstm import lstm_enc_dec
 from yt8m.data_io import readers
+from yt8m.data_io import vlad_readers
 import utils
 from .config import base as base_config
 import train_loop
@@ -105,13 +106,17 @@ class Expr(object):
     feature_names, feature_sizes = utils.GetListOfFeatureNamesAndSizes(
         self.config.feature_names, self.config.feature_sizes)
 
-    if self.config.use_frame_features:
+    if self.config.input_feat_type == "frame":
       reader = readers.YT8MFrameFeatureReader(
           feature_names=feature_names,
           num_max_labels=self.model.num_max_labels,
           feature_sizes=feature_sizes)
-    else:
+    elif self.config.input_feat_type == "video":
       reader = readers.YT8MAggregatedFeatureReader(
+          feature_names=feature_names,
+          feature_sizes=feature_sizes)
+    elif self.config.input_feat_type == "vlad":
+      reader = vlad_readers.YT8MVLADFeatureReader(
           feature_names=feature_names,
           feature_sizes=feature_sizes)
     return reader
