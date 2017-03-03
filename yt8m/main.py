@@ -62,9 +62,10 @@ class Expr(object):
           num_epochs=self.config.num_epochs)
       video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = inputs
 
-      conv = conv_train.Inception(model_input_raw, dense_labels_batch)
-      self.feed_out = conv.feed_out
-      init_fn = conv.get_init_fn()
+      self.model = conv_train.Inception(model_input_raw, dense_labels_batch)
+      self.feed_out = self.model.feed_out
+      self.global_step = self.model.global_step
+      init_fn = self.model.get_init_fn("/data/uts700/linchao/yt8m/YT/inception_v2.ckpt")
 
     if self.model.var_moving_average_decay > 0:
       print("Using moving average")

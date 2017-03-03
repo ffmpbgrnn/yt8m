@@ -34,13 +34,19 @@ class YT8MVLADFeatureReader(BaseReader):
 
     features = tf.parse_single_example(serialized_examples, features=feature_map)
 
-    concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [65536])
+    if False:
+      concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [65536])
+    else:
+      concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256, 1])
+      concatenated_features = tf.tile(concatenated_features, [1, 1, 3])
+      height, width = 299, 299
+      concatenated_features = tf.image.resize_images(concatenated_features, [height, width], method=0)
 
     sparse_labels = features["labels"].values
     dense_labels = (tf.cast(
         tf.sparse_to_dense(sparse_labels, (self.num_classes,), 1,
             validate_indices=False),
-        tf.bool))
+        tf.float32))
     sparse_labels = dense_labels
     weights = dense_labels
     num_frames = tf.ones([1])
