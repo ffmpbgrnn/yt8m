@@ -34,8 +34,7 @@ class BaseConfig(object):
         "LogisticModel",
     ]
     self.model_name = "LogisticModel"
-    self.label_smoothing = True
-
+    self.label_smoothing = False
     self.input_feat_type = "video"
     # self.model_name = "LSTMEncDec"
     if self.input_feat_type == "frame":
@@ -56,7 +55,7 @@ class BaseConfig(object):
       self.num_epochs = None
       if self.model_name == "LogisticModel":
         self.num_epochs = 5
-      self.batch_size = 256
+      self.batch_size = 128
     else:
       self.num_readers = 1
       self.num_epochs = 1

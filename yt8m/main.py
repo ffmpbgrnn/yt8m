@@ -43,7 +43,7 @@ class Expr(object):
       tf.set_random_seed(0)
 
     init_fn = None
-    if False:
+    if True:
       self.model = utils.find_class_by_name(self.config.model_name,
           [frame_level_models, video_level_models, lstm, lstm_enc_dec])()
       self.label_loss_fn = utils.find_class_by_name(

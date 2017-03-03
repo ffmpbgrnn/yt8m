@@ -13,8 +13,11 @@ from . import feeding_queue_runner as fqr
 class Feed_fn_setup(object):
   def __init__(self):
     with open("/data/state/linchao/YT/video_hdfs/train/mean.pkl") as fin:
-      self.vid_list = pkl.load(fin)
-    self.mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/train/mean.h5", 'r')['feas']
+      vid_list = pkl.load(fin)
+      self.vid_dict = {}
+      for i, vid in enumerate(vid_list):
+        self.vid_dict[vid] = i
+    self.mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/train/mean.h5", 'r', driver='core')['feas']
 
     print("loading vid info")
     with open("/data/uts700/linchao/yt8m/YT/data/vid_info/train_vid_to_labels_-1.pkl") as fin:
@@ -77,23 +80,20 @@ class Feed_fn_setup(object):
 class Feed_fn(object):
   def __init__(self, info, placeholders):
     self._i = info
-    self.vid_list = list(info.vid_list)
-    self.vid_to_labels = dict(info.vid_to_labels)
+    self.vid_dict = info.vid_dict
+    self.vid_to_labels = info.vid_to_labels
     self.placeholders = placeholders
 
   def __call__(self):
     vids = self._i.batch_id_queue.get()
     vid_index = []
-    dense_labels = []
-    for vid in vids:
-      idx = self.vid_list.index(vid)
+    dense_labels = np.zeros((len(vids), self._i.num_classes), dtype=np.int64)
+    for vid_idx, vid in enumerate(vids):
+      idx = self.vid_dict[vid]
       vid_index.append(idx)
-      dense_label = np.zeros((1, self._i.num_classes), dtype=np.int64)
       labels = self.vid_to_labels[vid]
       for l in labels:
-        dense_label[0, int(l)] = 1
-      dense_labels.append(dense_label)
-    dense_labels = np.vstack(dense_labels)
+        dense_labels[vid_idx, int(l)] = 1
 
     vid_index = np.array(vid_index)
     vid_index_sortidx = np.argsort(vid_index)
