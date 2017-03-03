@@ -12,25 +12,27 @@ from . import feeding_queue_runner as fqr
 
 class Feed_fn_setup(object):
   def __init__(self):
-    with open("/data/state/linchao/YT/hdfs/video/train/mean.pkl") as fin:
+    with open("/data/state/linchao/YT/video_hdfs/train/mean.pkl") as fin:
       self.vid_list = pkl.load(fin)
-    self.mean_data = h5py.File("/data/state/linchao/YT/hdfs/video/train/mean.h5", 'r')
+    self.mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/train/mean.h5", 'r')['feas']
 
-    with open("/data/uts700/linchao/yt8m/YT/data/vid_info/train_vid_to_labels.pkl") as fin:
+    print("loading vid info")
+    with open("/data/uts700/linchao/yt8m/YT/data/vid_info/train_vid_to_labels_-1.pkl") as fin:
       self.vid_to_labels = pkl.load(fin)
 
     self.label_to_vid_dict = {}
     for vid, labels in self.vid_to_labels.iteritems():
       for l in labels:
+        l = int(l)
         c = self.label_to_vid_dict.get(l, [])
         c.append(vid)
         self.label_to_vid_dict[l] = c
 
     self.num_classes = 4716
-    self.batch_size = 128
+    self.batch_size = 32
 
-    self.batch_id_queue = Queue.Queue(500)
-    bi_threads = [threading.Thread(target=self.input_vid_threads)]
+    self.batch_id_queue = Queue.Queue(1500)
+    bi_threads = threading.Thread(target=self.input_vid_threads)
     bi_threads.start()
 
 
@@ -49,6 +51,17 @@ class Feed_fn_setup(object):
       for label in labels:
         vids = self.label_to_vid_dict[label]
         vid_ptr = label_vid_ptr[label]
+        trav_cnt = 0
+        while vids[vid_ptr] in batch_vids:
+          if len(vids) == vid_ptr + 1:
+            vid_ptr = 0
+          else:
+            vid_ptr += 1
+          trav_cnt += 1
+          if trav_cnt == 100:
+            break
+        if trav_cnt == 100:
+          continue
         batch_vids.append(vids[vid_ptr])
         if len(batch_vids) == self.batch_size:
           self.batch_id_queue.put(batch_vids)
@@ -62,20 +75,23 @@ class Feed_fn_setup(object):
 
 
 class Feed_fn(object):
-  def __init__(self, info):
+  def __init__(self, info, placeholders):
     self._i = info
+    self.vid_list = list(info.vid_list)
+    self.vid_to_labels = dict(info.vid_to_labels)
+    self.placeholders = placeholders
 
   def __call__(self):
     vids = self._i.batch_id_queue.get()
     vid_index = []
     dense_labels = []
     for vid in vids:
-      idx = self._i.vid_list.index(vid)
+      idx = self.vid_list.index(vid)
       vid_index.append(idx)
       dense_label = np.zeros((1, self._i.num_classes), dtype=np.int64)
-      labels = self._i.vid_to_labels[vid]
+      labels = self.vid_to_labels[vid]
       for l in labels:
-        dense_label[0, l] = 1
+        dense_label[0, int(l)] = 1
       dense_labels.append(dense_label)
     dense_labels = np.vstack(dense_labels)
 
@@ -83,20 +99,19 @@ class Feed_fn(object):
     vid_index_sortidx = np.argsort(vid_index)
     batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
     batch_data = batch_data[np.argsort(vid_index_sortidx), :]
-    feed_dict = {
-      "video_id": np.array(vids),
-      "labels": dense_labels,
-      "feas": batch_data,
-    }
 
+    vals = [np.array(vids), dense_labels, batch_data]
+    feed_dict = {}
+    for pl, val in zip(self.placeholders, vals):
+      feed_dict[pl.name] = val
     return feed_dict
 
 def enqueue_data(name="enqueue_input", shuffle=True):
   fn_setup = Feed_fn_setup()
   queue_types = [tf.string, tf.int64, tf.float32]
   queue_shapes = [(), (4716,), (1024+128,)]
-  capacity = 500
-  num_threads = 4
+  capacity = 1500
+  num_threads = 8
   batch_size = 128
   with tf.name_scope(name):
     queue = tf.FIFOQueue(capacity,
@@ -116,7 +131,7 @@ def enqueue_data(name="enqueue_input", shuffle=True):
       out_ops = return_identity(placeholders)
 
       enqueue_ops.append(queue.enqueue_many(out_ops))
-      feed_fns.append(Feed_fn(fn_setup))
+      feed_fns.append(Feed_fn(fn_setup, placeholders))
 
     runner = fqr.FeedingQueueRunner(queue=queue,
                                     enqueue_ops=enqueue_ops,

@@ -56,7 +56,7 @@ class LogisticModel(models.BaseModel):
     if label_smoothing:
       labels = labels / tf.reduce_sum(labels, axis=1, keep_dims=True)
       loss = tf.nn.softmax_cross_entropy_with_logits(labels=labels, logits=logits)
-      loss = tf.reduce_mean(loss, 1)
+      loss = tf.reduce_mean(loss)
     else:
       print("Using sigmoid")
       loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)

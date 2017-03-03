@@ -16,7 +16,7 @@ def train_loop(self, model_ckpt_path, start_supervisor_services=True):
   if len(model_ckpt_path) > 0:
     variables_to_restore = tf.all_variables()
     init_fn = slim.assign_from_checkpoint_fn(
-        "/data/D2DCRC/linchao/YT/log/47/model.ckpt-57601",
+        model_ckpt_path,
         variables_to_restore,
         ignore_missing_vars=False,)
 
