@@ -1,10 +1,10 @@
 import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
 
-# from inception_v2 import inception_v2_arg_scope as inception_arg_scope
-# from inception_v2 import inception_v2 as inception
-from inception_v3 import inception_v3_arg_scope as inception_arg_scope
-from inception_v3 import inception_v3 as inception
+from inception_v2 import inception_v2_arg_scope as inception_arg_scope
+from inception_v2 import inception_v2 as inception
+# from inception_v3 import inception_v3_arg_scope as inception_arg_scope
+# from inception_v3 import inception_v3 as inception
 
 slim = tf.contrib.slim
 
@@ -91,7 +91,7 @@ class Inception():
       # self.feed_out['vnames'] = self.vnames
 
   def get_init_fn(self, checkpoint_path):
-    if "inception_resnet_v2_2016_08_30" in checkpoint_path:
+    if "inception" in checkpoint_path:
       checkpoint_exclude_scopes = "InceptionV2/Logits,InceptionV2/AuxLogits/Logits"
       exclusions = []
       if checkpoint_exclude_scopes:

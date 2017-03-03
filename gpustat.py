@@ -68,7 +68,7 @@ def get_available_gpu(gpu_id_mapping, stats, mem_percent):
   gpus = []
   for gpu in stats:
     estimate_memory = int(int(gpu['memory.total']) * mem_percent)
-    if 1. * int(gpu['memory.used']) < estimate_memory and int(gpu['temperature.gpu']) < 70:
+    if 1. * int(gpu['memory.used']) < estimate_memory and int(gpu['temperature.gpu']) < 80:
       gpu_id = int(gpu['index'])
       gpus.append(gpu_id_mapping[gpu_id])
   return gpus

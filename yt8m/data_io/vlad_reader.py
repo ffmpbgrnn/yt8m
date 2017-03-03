@@ -38,8 +38,9 @@ class YT8MVLADFeatureReader(BaseReader):
       concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [65536])
     else:
       concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256, 1])
-      concatenated_features = tf.tile(concatenated_features, [1, 1, 3])
-      height, width = 299, 299
+      # concatenated_features = tf.tile(concatenated_features, [1, 1, 3])
+      concatenated_features = tf.pad(concatenated_features, [[0, 0], [0, 0], [0, 2]], "CONSTANT")
+      height, width = 224, 224
       concatenated_features = tf.image.resize_images(concatenated_features, [height, width], method=0)
 
     sparse_labels = features["labels"].values
