@@ -11,6 +11,7 @@ from yt8m.models.lstm import lstm
 from yt8m.models.lstm import lstm_enc_dec
 from yt8m.data_io import readers
 from yt8m.data_io import vlad_reader
+from yt8m.data_io import hdfs_reader
 import utils
 from .config import base as base_config
 import train_loop
@@ -47,8 +48,7 @@ class Expr(object):
     self.optimizer = utils.find_class_by_name(
         self.model.optimizer_name, [tf.train])
 
-    self.reader = self.get_reader()
-    self.num_classes = self.reader.num_classes
+    self.num_classes = 4716
 
     self.build_graph()
     logging.info("built graph")
@@ -73,6 +73,7 @@ class Expr(object):
                              data_pattern,
                              num_epochs=None,
                              num_readers=1):
+    reader = self.get_reader()
     logging.info("Using batch size of " + str(self.batch_size) + ".")
     with tf.name_scope("model_input"):
       files = gfile.Glob(data_pattern)
@@ -83,7 +84,7 @@ class Expr(object):
       filename_queue = tf.train.string_input_producer(
           files, shuffle=self.phase_train, num_epochs=num_epochs)
       data = [
-          self.reader.prepare_reader(filename_queue) for _ in xrange(num_readers)]
+          reader.prepare_reader(filename_queue) for _ in xrange(num_readers)]
 
       if self.phase_train:
         return tf.train.shuffle_batch_join(
@@ -127,10 +128,17 @@ class Expr(object):
         self.ps_tasks, merge_devices=True)):
       self.global_step = tf.Variable(0, trainable=False, name="global_step")
 
-      video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = self.get_input_data_tensors(
-          self.config.data_pattern,
-          num_readers=self.config.num_readers,
-          num_epochs=self.config.num_epochs)
+      if False:
+        inputs = self.get_input_data_tensors(
+            self.config.data_pattern,
+            num_readers=self.config.num_readers,
+            num_epochs=self.config.num_epochs)
+        video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = inputs
+      else:
+        inputs = hdfs_reader.enqueue_data()
+        video_id_batch, dense_labels_batch, model_input_raw = inputs
+        sparse_labels_batch, num_frames, label_weights_batch = None, None, None
+
       feature_dim = len(model_input_raw.get_shape()) - 1
 
       if self.model.normalize_input:
@@ -143,7 +151,7 @@ class Expr(object):
         result = self.model.create_model(
             model_input,
             num_frames=num_frames,
-            vocab_size=self.reader.num_classes,
+            vocab_size=self.num_classes,
             dense_labels=dense_labels_batch,
             sparse_labels=sparse_labels_batch,
             label_weights=label_weights_batch,
