@@ -9,10 +9,9 @@ import utils
 
 slim = tf.contrib.slim
 
-def train_loop(self, model_ckpt_path, start_supervisor_services=True):
+def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=True):
   saver = tf.train.Saver(max_to_keep=1000000)
 
-  init_fn = None
   if len(model_ckpt_path) > 0:
     variables_to_restore = tf.all_variables()
     init_fn = slim.assign_from_checkpoint_fn(

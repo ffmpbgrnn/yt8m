@@ -14,6 +14,7 @@ from yt8m.data_io import vlad_reader
 from yt8m.data_io import hdfs_reader
 import utils
 from .config import base as base_config
+import models.conv.train as conv_train
 import train_loop
 import eval_loop
 import inference_loop
@@ -41,17 +42,29 @@ class Expr(object):
     if not self.phase_train:
       tf.set_random_seed(0)
 
-    self.model = utils.find_class_by_name(self.config.model_name,
-        [frame_level_models, video_level_models, lstm, lstm_enc_dec])()
-    self.label_loss_fn = utils.find_class_by_name(
-        self.config.label_loss, [losses])()
-    self.optimizer = utils.find_class_by_name(
-        self.model.optimizer_name, [tf.train])
+    init_fn = None
+    if False:
+      self.model = utils.find_class_by_name(self.config.model_name,
+          [frame_level_models, video_level_models, lstm, lstm_enc_dec])()
+      self.label_loss_fn = utils.find_class_by_name(
+          self.config.label_loss, [losses])()
+      self.optimizer = utils.find_class_by_name(
+          self.model.optimizer_name, [tf.train])
 
-    self.num_classes = 4716
+      self.num_classes = 4716
 
-    self.build_graph()
-    logging.info("built graph")
+      self.build_graph()
+      logging.info("built graph")
+    else:
+      inputs = self.get_input_data_tensors(
+          self.config.data_pattern,
+          num_readers=self.config.num_readers,
+          num_epochs=self.config.num_epochs)
+      video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = inputs
+
+      conv = conv_train.Inception(model_input_raw, dense_labels_batch)
+      self.feed_out = conv.feed_out
+      init_fn = conv.get_init_fn()
 
     if self.model.var_moving_average_decay > 0:
       print("Using moving average")
@@ -63,7 +76,7 @@ class Expr(object):
       eval_saver = tf.train.Saver(tf.global_variables())
 
     if self.stage == "train":
-      train_loop.train_loop(self, self.model_ckpt_path)
+      train_loop.train_loop(self, self.model_ckpt_path, init_fn=init_fn)
     elif self.stage == "eval":
       eval_loop.evaluation_loop(self, eval_saver, self.model_ckpt_path)
     elif self.stage == "inference":
