@@ -32,10 +32,12 @@ class BaseConfig(object):
         "LSTMEncoder",
         "LSTMEncDec",
         "LogisticModel",
+        "SkipThought",
     ]
-    self.model_name = "LogisticModel"
+    self.model_name = "SkipThought"
     self.label_smoothing = False
-    self.input_feat_type = "video"
+    self.input_feat_type = "frame"
+    self.use_hdfs = False
     # self.model_name = "LSTMEncDec"
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"

@@ -9,6 +9,51 @@ import utils
 
 slim = tf.contrib.slim
 
+def supervised_tasks(self, sv, res):
+  global_step = res["global_step"]
+  predictions = res["predictions"]
+  batch_start_time = res["batch_start_time"]
+  if type(predictions) == list:
+    predictions = eval_util.transform_preds(self, predictions)
+  dense_labels = res["dense_labels"]
+
+  seconds_per_batch = time.time() - batch_start_time
+  examples_per_second = dense_labels.shape[0] / seconds_per_batch
+
+  hit_at_one = eval_util.calculate_hit_at_one(predictions, dense_labels)
+  perr = eval_util.calculate_precision_at_equal_recall_rate(predictions,
+                                                            dense_labels)
+  gap = eval_util.calculate_gap(predictions, dense_labels)
+
+  log_info_str, log_info = "", {
+      "Training step": global_step,
+      "Hit@1": hit_at_one,
+      "PERR": perr,
+      "GAP": gap,
+      "Loss": res["loss"],
+      "Global norm": res["global_norm"],
+      "Exps/sec": examples_per_second,
+  }
+  for k, v in log_info.iteritems():
+    log_info_str += "%s: %.2f;  " % (k, v)
+
+  if self.is_chief and global_step % 10 == 0 and self.config.train_dir:
+    sv.summary_writer.add_summary(
+        utils.MakeSummary("model/Training_Hit@1",
+                          hit_at_one), global_step)
+    sv.summary_writer.add_summary(
+        utils.MakeSummary("model/Training_Perr", perr),
+        global_step)
+    sv.summary_writer.add_summary(
+        utils.MakeSummary("model/Training_GAP", gap),
+        global_step)
+    sv.summary_writer.add_summary(
+        utils.MakeSummary("global_step/Examples/Second",
+                          examples_per_second),
+        global_step)
+    sv.summary_writer.flush()
+  return log_info_str
+
 def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=True):
   saver = tf.train.Saver(max_to_keep=1000000)
 
@@ -41,57 +86,32 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
     while not sv.should_stop():
       batch_start_time = time.time()
       res = sess.run(self.feed_out)
-
-      global_step = res["global_step"]
-      predictions = res["predictions"]
-      if type(predictions) == list:
-        predictions = eval_util.transform_preds(self, predictions)
-      dense_labels = res["dense_labels"]
-
-      seconds_per_batch = time.time() - batch_start_time
-      examples_per_second = dense_labels.shape[0] / seconds_per_batch
-
-      hit_at_one = eval_util.calculate_hit_at_one(predictions, dense_labels)
-      perr = eval_util.calculate_precision_at_equal_recall_rate(predictions,
-                                                                dense_labels)
-      gap = eval_util.calculate_gap(predictions, dense_labels)
-
-      log_info_str, log_info = "", {
-          "Training step": global_step,
-          "Hit@1": hit_at_one,
-          "PERR": perr,
-          "GAP": gap,
-          "Loss": res["loss"],
-          "Global norm": res["global_norm"],
-          "Exps/sec": examples_per_second,
-      }
-      for k, v in log_info.iteritems():
-        log_info_str += "%s: %.2f;  " % (k, v)
+      res["batch_start_time"] = batch_start_time
+      if res["predictions"] is None:
+        log_info_str = "Step loss:{}".format()
+      else:
+        log_info_str = supervised_tasks(self, sv, res)
       logging.info(log_info_str)
       log_fout.write(log_info_str+'\n')
-      if global_step % 100 == 0: log_fout.flush()
-      if self.is_chief and global_step % 10 == 0 and self.config.train_dir:
-        sv.summary_writer.add_summary(
-            utils.MakeSummary("model/Training_Hit@1",
-                              hit_at_one), global_step)
-        sv.summary_writer.add_summary(
-            utils.MakeSummary("model/Training_Perr", perr),
-            global_step)
-        sv.summary_writer.add_summary(
-            utils.MakeSummary("model/Training_GAP", gap),
-            global_step)
-        sv.summary_writer.add_summary(
-            utils.MakeSummary("global_step/Examples/Second",
-                              examples_per_second),
-            global_step)
-        sv.summary_writer.flush()
+      if res["global_step"] % 100 == 0:
+        log_fout.flush()
+
   except tf.errors.OutOfRangeError:
     logging.info("Done training -- epoch limit reached")
   logging.info("exited training loop")
   sv.Stop()
-  return hit_at_one, perr
 
-def get_train_op(self, opt, result, label_loss):
+def get_train_op(self, result, label_loss):
+  if self.model.optimizer_name == "MomentumOptimizer":
+    opt = self.optimizer(self.model.base_learning_rate, 0.9)
+  elif self.model.optimizer_name == "RMSPropOptimizer":
+    opt = tf.train.RMSPropOptimizer(
+        self.model.base_learning_rate,
+        decay=0.9,
+        momentum=0.9,
+        epsilon=1)
+  else:
+    opt = self.optimizer(self.model.base_learning_rate)
   for variable in slim.get_model_variables():
     tf.summary.histogram(variable.op.name, variable)
   tf.summary.scalar("label_loss", label_loss)

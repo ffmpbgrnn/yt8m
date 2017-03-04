@@ -11,7 +11,7 @@ from . import feeding_queue_runner as fqr
 
 
 class Feed_fn_setup(object):
-  def __init__(self):
+  def __init__(self, num_classes):
     with open("/data/state/linchao/YT/video_hdfs/train/mean.pkl") as fin:
       vid_list = pkl.load(fin)
       self.vid_dict = {}
@@ -31,7 +31,7 @@ class Feed_fn_setup(object):
         c.append(vid)
         self.label_to_vid_dict[l] = c
 
-    self.num_classes = 4716
+    self.num_classes = num_classes
     self.batch_size = 32
 
     self.batch_id_queue = Queue.Queue(1500)
@@ -106,13 +106,12 @@ class Feed_fn(object):
       feed_dict[pl.name] = val
     return feed_dict
 
-def enqueue_data(name="enqueue_input", shuffle=True):
-  fn_setup = Feed_fn_setup()
+def enqueue_data(batch_size, num_classes, feature_size, name="enqueue_input",):
+  fn_setup = Feed_fn_setup(num_classes)
   queue_types = [tf.string, tf.int64, tf.float32]
-  queue_shapes = [(), (4716,), (1024+128,)]
+  queue_shapes = [(), (num_classes,), (feature_size,)]
   capacity = 1500
   num_threads = 8
-  batch_size = 128
   with tf.name_scope(name):
     queue = tf.FIFOQueue(capacity,
                          dtypes=queue_types,

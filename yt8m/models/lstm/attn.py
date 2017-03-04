@@ -74,7 +74,7 @@ def attention_decoder(decoder_inputs,
     hidden_features = []
     v = []
     # TODO
-    attention_vec_size = attn_size  # Size of query vectors for attention.
+    attention_vec_size = 100 #attn_size  # Size of query vectors for attention.
     for a in xrange(num_heads):
       k = variable_scope.get_variable("AttnW_%d" % a,
                                       [1, 1, attn_size, attention_vec_size])

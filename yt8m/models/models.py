@@ -27,3 +27,6 @@ class BaseModel(object):
 
   def create_model(self, unused_model_input, **unused_params):
     raise NotImplementedError()
+
+  def get_train_init_fn(self):
+    return None
