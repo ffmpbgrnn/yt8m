@@ -255,7 +255,7 @@ class YT8MFrameFeatureReader(BaseReader):
       label_weights = tf.reshape(label_weights, [self.num_max_labels])
     else:
       sparse_labels = dense_labels
-      label_weights = tf.constant(1., dtype=tf.int64)
+      label_weights = tf.constant(1, dtype=tf.int64)
 
     # loads (potentially) different types of features and concatenates them
     num_features = len(self.feature_names)

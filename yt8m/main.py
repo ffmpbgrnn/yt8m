@@ -54,7 +54,7 @@ class Expr(object):
     # convert feature_names and feature_sizes to lists of values
     self.feature_names, self.feature_sizes = utils.GetListOfFeatureNamesAndSizes(
         self.config.feature_names, self.config.feature_sizes)
-    if self.use_hdfs:
+    if self.config.use_hdfs:
       inputs = hdfs_reader.enqueue_data(self.batch_size, self.num_classes, sum(self.feature_sizes))
       video_id_batch, dense_labels_batch, model_input_raw = inputs
       sparse_labels_batch, num_frames, label_weights_batch = None, None, None
@@ -161,7 +161,7 @@ class Expr(object):
             label_weights=label_weights_batch,
             is_training=self.phase_train,
             label_smoothing=self.config.label_smoothing,
-            feature_size=self.feature_sizes)
+            feature_sizes=self.feature_sizes)
 
         predictions = result["predictions"]
         if "loss" in result.keys():

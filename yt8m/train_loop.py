@@ -12,30 +12,24 @@ slim = tf.contrib.slim
 def supervised_tasks(self, sv, res):
   global_step = res["global_step"]
   predictions = res["predictions"]
-  batch_start_time = res["batch_start_time"]
   if type(predictions) == list:
     predictions = eval_util.transform_preds(self, predictions)
   dense_labels = res["dense_labels"]
-
-  seconds_per_batch = time.time() - batch_start_time
-  examples_per_second = dense_labels.shape[0] / seconds_per_batch
 
   hit_at_one = eval_util.calculate_hit_at_one(predictions, dense_labels)
   perr = eval_util.calculate_precision_at_equal_recall_rate(predictions,
                                                             dense_labels)
   gap = eval_util.calculate_gap(predictions, dense_labels)
 
-  log_info_str, log_info = "", {
+  log_info = {
       "Training step": global_step,
       "Hit@1": hit_at_one,
       "PERR": perr,
       "GAP": gap,
       "Loss": res["loss"],
       "Global norm": res["global_norm"],
-      "Exps/sec": examples_per_second,
+      "Exps/sec": res["examples_per_second"],
   }
-  for k, v in log_info.iteritems():
-    log_info_str += "%s: %.2f;  " % (k, v)
 
   if self.is_chief and global_step % 10 == 0 and self.config.train_dir:
     sv.summary_writer.add_summary(
@@ -49,10 +43,10 @@ def supervised_tasks(self, sv, res):
         global_step)
     sv.summary_writer.add_summary(
         utils.MakeSummary("global_step/Examples/Second",
-                          examples_per_second),
+                          res["examples_per_second"]),
         global_step)
     sv.summary_writer.flush()
-  return log_info_str
+  return log_info
 
 def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=True):
   saver = tf.train.Saver(max_to_keep=1000000)
@@ -86,11 +80,22 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
     while not sv.should_stop():
       batch_start_time = time.time()
       res = sess.run(self.feed_out)
-      res["batch_start_time"] = batch_start_time
+      seconds_per_batch = time.time() - batch_start_time
+      examples_per_second = res["dense_labels"].shape[0] / seconds_per_batch
+
+      log_info_str = ""
       if res["predictions"] is None:
-        log_info_str = "Step loss:{}".format()
+        log_info = {
+          "Training step": res["global_step"],
+          "Loss": res["loss"],
+          "Global norm": res["global_norm"],
+          "Exps/sec": examples_per_second,
+        }
       else:
-        log_info_str = supervised_tasks(self, sv, res)
+        res["examples_per_second"] = examples_per_second
+        log_info = supervised_tasks(self, sv, res)
+      for k, v in log_info.iteritems():
+        log_info_str += "%s: %.2f;  " % (k, v)
       logging.info(log_info_str)
       log_fout.write(log_info_str+'\n')
       if res["global_step"] % 100 == 0:

@@ -25,9 +25,10 @@ class SkipThought(models.BaseModel):
     self.max_steps = 30
 
   def create_model(self, model_input, vocab_size, num_frames,
-                   is_training=True, feature_size=None,
+                   is_training=True, feature_sizes=None,
                    **unused_params):
     self.phase_train = is_training
+    feature_size = sum(feature_sizes)
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     enc_inputs = utils.SampleRandomSequence(model_input, num_frames,
                                             self.max_steps)
@@ -40,7 +41,7 @@ class SkipThought(models.BaseModel):
     enc_outputs, enc_state = tf.nn.dynamic_rnn(
         enc_cell, enc_inputs, initial_state=enc_init_state, scope="enc")
 
-    dec_targets = tf.unstack(enc_inputs)
+    dec_targets = tf.unstack(enc_inputs, axis=1)
     dec_targets.reverse()
     dec_inputs = [tf.zeros_like(dec_targets[0])] + dec_targets[:-1]
 
@@ -64,14 +65,16 @@ class SkipThought(models.BaseModel):
 
   def get_enc_cell(self, cell_size, vocab_size):
     cell = core_rnn_cell.GRUCell(cell_size)
+    cell = rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
     cell = core_rnn_cell.InputProjectionWrapper(cell, cell_size)
     cell = core_rnn_cell.OutputProjectionWrapper(cell, cell_size)
     return cell
 
   def get_dec_cell(self, cell_size):
     cell = core_rnn_cell.GRUCell(cell_size)
-    num_layers = 1
-    cell = core_rnn_cell.MultiRNNCell([cell] * num_layers)
+    cell = rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
+    # num_layers = 1
+    # cell = core_rnn_cell.MultiRNNCell([cell] * num_layers)
     return cell
 
   def reconstruct_loss(self, logit, target):
@@ -82,7 +85,7 @@ class SkipThought(models.BaseModel):
     if True:
       a = .5 * delta * d * d
       b = tf.abs(d) - 0.5 / delta
-      l = tf.select(tf.abs(d) < (1. / delta), a, b)
+      l = tf.where(tf.abs(d) < (1. / delta), a, b)
     else:
       l = .5 * d * d
     # loss = tf.reduce_sum(d * d, reduction_indices=1)
