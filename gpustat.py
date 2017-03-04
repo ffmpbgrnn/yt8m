@@ -28,6 +28,10 @@ def main(hostname, mem_percent):
         1: 2,
         2: 1,
         3: 0,}
+  elif hostname == "UTS0":
+    gpu_id_mapping = {
+        0: 0,
+        1: 1,}
   gpu_query_columns = ('index', 'uuid', 'name', 'temperature.gpu',
                         'utilization.gpu', 'memory.used', 'memory.total')
 
@@ -67,6 +71,8 @@ def main(hostname, mem_percent):
 def get_available_gpu(gpu_id_mapping, stats, mem_percent):
   gpus = []
   for gpu in stats:
+    if gpu['name'] not in GPU_names:
+      continue
     estimate_memory = int(int(gpu['memory.total']) * mem_percent)
     if 1. * int(gpu['memory.used']) < estimate_memory and int(gpu['temperature.gpu']) < 80:
       gpu_id = int(gpu['index'])
