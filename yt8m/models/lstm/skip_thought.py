@@ -65,14 +65,14 @@ class SkipThought(models.BaseModel):
 
   def get_enc_cell(self, cell_size, vocab_size):
     cell = core_rnn_cell.GRUCell(cell_size)
-    cell = rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
+    cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
     cell = core_rnn_cell.InputProjectionWrapper(cell, cell_size)
     cell = core_rnn_cell.OutputProjectionWrapper(cell, cell_size)
     return cell
 
   def get_dec_cell(self, cell_size):
     cell = core_rnn_cell.GRUCell(cell_size)
-    cell = rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
+    cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
     # num_layers = 1
     # cell = core_rnn_cell.MultiRNNCell([cell] * num_layers)
     return cell
