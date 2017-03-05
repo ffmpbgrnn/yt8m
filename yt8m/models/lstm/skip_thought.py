@@ -22,14 +22,13 @@ class SkipThought(models.BaseModel):
     self.base_learning_rate = 1e-4
 
     self.cell_size = 1024
-    self.max_steps = 30
 
   def create_model(self, model_input, vocab_size, num_frames,
-                   is_training=True, feature_sizes=None,
+                   is_training=True, dense_labels=None, feature_sizes=None,
                    **unused_params):
-    self.phase_train = is_training
     feature_size = sum(feature_sizes)
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    self.max_steps = 30
     enc_inputs = utils.SampleRandomSequence(model_input, num_frames,
                                             self.max_steps)
 
@@ -41,25 +40,39 @@ class SkipThought(models.BaseModel):
     enc_outputs, enc_state = tf.nn.dynamic_rnn(
         enc_cell, enc_inputs, initial_state=enc_init_state, scope="enc")
 
-    dec_targets = tf.unstack(enc_inputs, axis=1)
-    dec_targets.reverse()
-    dec_inputs = [tf.zeros_like(dec_targets[0])] + dec_targets[:-1]
+    if True:
+      enc_outputs_stopped = tf.stop_gradient(enc_outputs)
+      enc_rep = tf.reduce_sum(enc_outputs_stopped, axis=1) / num_frames
 
-    dec_outputs, _ = attn.attention_decoder(decoder_inputs=dec_inputs,
-                                            initial_state=enc_state,
-                                            attention_states=enc_outputs,
-                                            cell=dec_cell,
-                                            output_size=feature_size,
-                                            dtype=tf.float32)
-    dec_weights = []
-    for _ in xrange(self.max_steps):
-      dec_weights.append(tf.ones([runtime_batch_size, ], dtype=tf.float32))
-    loss = seq2seq_lib.sequence_loss(
-        dec_outputs, dec_targets, dec_weights,
-        softmax_loss_function=self.reconstruct_loss)
+      logits = slim.fully_connected(
+          enc_rep, vocab_size, activation_fn=None,
+          weights_regularizer=slim.l2_regularizer(1e-8))
+
+      loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(dense_labels, tf.float32),
+                                                    logits=logits)
+      loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+      predictions = tf.nn.sigmoid(logits)
+    else:
+      dec_targets = tf.unstack(enc_inputs, axis=1)
+      dec_targets.reverse()
+      dec_inputs = [tf.zeros_like(dec_targets[0])] + dec_targets[:-1]
+
+      dec_outputs, _ = attn.attention_decoder(decoder_inputs=dec_inputs,
+                                              initial_state=enc_state,
+                                              attention_states=enc_outputs,
+                                              cell=dec_cell,
+                                              output_size=feature_size,
+                                              dtype=tf.float32)
+      dec_weights = []
+      for _ in xrange(self.max_steps):
+        dec_weights.append(tf.ones([runtime_batch_size, ], dtype=tf.float32))
+      loss = seq2seq_lib.sequence_loss(
+          dec_outputs, dec_targets, dec_weights,
+          softmax_loss_function=self.reconstruct_loss)
+      predictions = tf.no_op()
     return {
         "loss": loss,
-        "predictions": tf.no_op()
+        "predictions": predictions,
     }
 
 
