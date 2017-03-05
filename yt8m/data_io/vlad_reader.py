@@ -37,9 +37,9 @@ class YT8MVLADFeatureReader(BaseReader):
     if True:
       input_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256])
       input_features = tf.sign(input_features) * tf.sqrt(tf.abs(input_features))
-      input_features = tf.nn.l2_normalize(input_features, axis=1)
+      input_features = tf.nn.l2_normalize(input_features, 1)
       input_features = tf.reshape(input_features, [256*256])
-      input_features = tf.nn.l2_normalize(input_features, axis=0)
+      # input_features = tf.nn.l2_normalize(input_features, axis=0)
     else:
       input_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256, 1])
       # input_features = tf.tile(input_features, [1, 1, 3])
