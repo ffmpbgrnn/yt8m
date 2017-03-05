@@ -34,14 +34,18 @@ class YT8MVLADFeatureReader(BaseReader):
 
     features = tf.parse_single_example(serialized_examples, features=feature_map)
 
-    if False:
-      concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [65536])
+    if True:
+      input_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256])
+      input_features = tf.sign(input_features) * tf.sqrt(tf.abs(input_features))
+      input_features = tf.nn.l2_normalize(input_features, axis=1)
+      input_features = tf.reshape(input_features, [256*256])
+      input_features = tf.nn.l2_normalize(input_features, axis=0)
     else:
-      concatenated_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256, 1])
-      # concatenated_features = tf.tile(concatenated_features, [1, 1, 3])
-      concatenated_features = tf.pad(concatenated_features, [[0, 0], [0, 0], [0, 2]], "CONSTANT")
+      input_features = tf.reshape(tf.cast(tf.decode_raw(features["feas"], tf.float16), tf.float32), [256, 256, 1])
+      # input_features = tf.tile(input_features, [1, 1, 3])
+      input_features = tf.pad(input_features, [[0, 0], [0, 0], [0, 2]], "CONSTANT")
       height, width = 224, 224
-      concatenated_features = tf.image.resize_images(concatenated_features, [height, width], method=0)
+      input_features = tf.image.resize_images(input_features, [height, width], method=0)
 
     sparse_labels = features["labels"].values
     dense_labels = (tf.cast(
@@ -53,7 +57,7 @@ class YT8MVLADFeatureReader(BaseReader):
     num_frames = tf.ones([1])
 
     batch_video_ids = tf.expand_dims(features["video_id"], 0)
-    batch_video_matrix = tf.expand_dims(concatenated_features, 0)
+    batch_video_matrix = tf.expand_dims(input_features, 0)
     batch_dense_labels = tf.expand_dims(dense_labels, 0)
     batch_sparse_labels = tf.expand_dims(sparse_labels, 0)
     batch_label_weights = tf.expand_dims(weights, 0)
