@@ -141,7 +141,7 @@ class Expr(object):
         self.ps_tasks, merge_devices=True)):
       self.global_step = tf.Variable(0, trainable=False, name="global_step")
 
-      video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = inputs
+      video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch, input_weights_batch = inputs
       feature_dim = len(model_input_raw.get_shape()) - 1
 
       if self.model.normalize_input:
@@ -161,6 +161,7 @@ class Expr(object):
             label_weights=label_weights_batch,
             is_training=self.phase_train,
             label_smoothing=self.config.label_smoothing,
+            input_weights=input_weights_batch,
             feature_sizes=self.feature_sizes)
 
         predictions = result["predictions"]

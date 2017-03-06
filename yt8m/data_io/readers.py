@@ -124,8 +124,8 @@ class YT8MAggregatedFeatureReader(BaseReader):
 
     concatenated_features = tf.concat([
         features[feature_name] for feature_name in self.feature_names], 1)
-    sparse_labels, weights = labels, labels
-    return features["video_id"], concatenated_features, labels, sparse_labels, tf.ones([tf.shape(serialized_examples)[0]]), weights
+    sparse_labels, label_weights, input_weights = labels, labels, labels
+    return features["video_id"], concatenated_features, labels, sparse_labels, tf.ones([tf.shape(serialized_examples)[0]]), label_weights, input_weights
 
 class YT8MFrameFeatureReader(BaseReader):
   """Reads TFRecords of SequenceExamples.
@@ -243,13 +243,24 @@ class YT8MFrameFeatureReader(BaseReader):
         # x = pad
       return (x, w)
 
+    def random_pick_one(x):
+      x = x.tolist()
+      idx = np.random.randint(len(x))
+      x = [x[idx],]
+      w = [1,]
+      return (x, w)
+
     # read ground truth labels
     sparse_labels = contexts["labels"].values
     dense_labels = (tf.cast(
         tf.sparse_to_dense(sparse_labels, (self.num_classes,), 1,
             validate_indices=False),
         tf.bool))
-    if self.num_max_labels > 0:
+    if self.num_max_labels == 1:
+      sparse_labels, label_weights = tf.py_func(random_pick_one, [sparse_labels], [tf.int64, tf.int64])
+      sparse_labels = tf.reshape(sparse_labels, [1,])
+      label_weights = tf.reshape(label_weights, [1,])
+    elif self.num_max_labels > 0:
       sparse_labels, label_weights = tf.py_func(sort_and_pad, [sparse_labels], [tf.int64, tf.int64])
       sparse_labels = tf.reshape(sparse_labels, [self.num_max_labels])
       label_weights = tf.reshape(label_weights, [self.num_max_labels])
@@ -296,4 +307,13 @@ class YT8MFrameFeatureReader(BaseReader):
     batch_label_weights = tf.expand_dims(label_weights, 0)
     batch_frames = tf.expand_dims(num_frames, 0)
 
-    return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, batch_frames, batch_label_weights
+    input_weights = tf.ones([num_frames,], dtype=tf.float32)
+    input_weights = tf.pad(
+        input_weights,
+        [[0, self.max_frames - num_frames]],
+        "CONSTANT")
+    input_weights.set_shape([self.max_frames])
+    batch_input_weights = tf.expand_dims(input_weights, 0)
+
+    return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, \
+           batch_frames, batch_label_weights, batch_input_weights
