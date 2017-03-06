@@ -44,7 +44,8 @@ class Expr(object):
       tf.set_random_seed(0)
 
     self.model = utils.find_class_by_name(self.config.model_name,
-        [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought])()
+        [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
+         conv_train])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
@@ -139,7 +140,7 @@ class Expr(object):
   def build_graph(self, inputs):
     with tf.device(tf.train.replica_device_setter(
         self.ps_tasks, merge_devices=True)):
-      self.global_step = tf.Variable(0, trainable=False, name="global_step")
+      self.global_step = tf.Variable(0, trainable=False, name="global_step", dtype=tf.int64)
 
       video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch = inputs
       feature_dim = len(model_input_raw.get_shape()) - 1
