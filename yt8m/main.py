@@ -10,6 +10,7 @@ from yt8m.starter import video_level_models
 from yt8m.models.lstm import lstm
 from yt8m.models.lstm import lstm_enc_dec
 from yt8m.models.lstm import skip_thought
+from yt8m.models.lstm import lstm_memnet
 from yt8m.data_io import readers
 from yt8m.data_io import vlad_reader
 from yt8m.data_io import hdfs_reader
@@ -44,7 +45,8 @@ class Expr(object):
       tf.set_random_seed(0)
 
     self.model = utils.find_class_by_name(self.config.model_name,
-        [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought])()
+        [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
+         lstm_memnet])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
