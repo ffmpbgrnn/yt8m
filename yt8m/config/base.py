@@ -33,10 +33,11 @@ class BaseConfig(object):
         "LSTMEncDec",
         "LogisticModel",
         "SkipThought",
+        "Inception",
     ]
-    self.model_name = "SkipThought"
+    self.model_name = "Inception"
     self.label_smoothing = False
-    self.input_feat_type = "frame"
+    self.input_feat_type = "vlad"
     self.use_hdfs = False
     # self.model_name = "LSTMEncDec"
     if self.input_feat_type == "frame":
