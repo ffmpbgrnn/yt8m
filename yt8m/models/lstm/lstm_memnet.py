@@ -155,7 +155,8 @@ def attention_decoder(decoder_inputs,
         attns = attention(state)
 
       with variable_scope.variable_scope("AttnOutputProjection"):
-        output = linear([cell_output] + attns, output_size, True)
+        # output = linear([cell_output] + attns, output_size, True)
+        output = linear(attns, output_size, True)
       if loop_function is not None:
         prev = output
       outputs.append(output)
@@ -214,7 +215,6 @@ class LSTMMemNet(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 3e-4
 
-    self.cell_size = 1024
     self.max_steps = 300
     self.num_max_labels = 1
 
@@ -223,6 +223,8 @@ class LSTMMemNet(models.BaseModel):
                    input_weights=None,
                    **unused_params):
     input_size = 1024 + 128
+    self.cell_size = input_size
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     # model_input = utils.SampleRandomSequence(model_input, num_frames,
                                              # self.max_steps)
     input_weights = tf.tile(
@@ -233,20 +235,57 @@ class LSTMMemNet(models.BaseModel):
     init_state = tf.reduce_sum(model_input, axis=1) / num_frames
     dec_cell = core_rnn_cell.GRUCell(self.cell_size)
     sparse_labels = tf.reshape(sparse_labels, [-1])
-    outputs, _ = embedding_attention_decoder(sparse_labels, initial_state=init_state,
-                                             attention_states=model_input,
-                                             cell=dec_cell,
-                                             num_symbols=vocab_size,
-                                             embedding_size=512,
-                                             num_heads=1,
-                                             output_size=vocab_size,
-                                             output_projection=None,
-                                             feed_previous=False,
-                                             dtype=tf.float32,
-                                             scope="LSTMMemNet")
-    logits = outputs[0]
-    loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=sparse_labels, logits=logits)
-    predictions = tf.nn.softmax(logits)
+    if is_training:
+      outputs, _ = embedding_attention_decoder([sparse_labels], initial_state=init_state,
+                                               attention_states=model_input,
+                                               cell=dec_cell,
+                                               num_symbols=vocab_size,
+                                               embedding_size=512,
+                                               num_heads=1,
+                                               output_size=vocab_size,
+                                               output_projection=None,
+                                               feed_previous=False,
+                                               dtype=tf.float32,
+                                               scope="LSTMMemNet")
+      logits = outputs[0]
+      loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=sparse_labels, logits=logits)
+      loss = tf.reduce_mean(loss)
+      predictions = tf.nn.softmax(logits)
+    else:
+      loss = tf.constant(0.0)
+      runtime_batch_size = tf.shape(model_input)[0]
+      first = True
+      with variable_scope.variable_scope("LSTMMemNet", dtype=tf.float32):
+        with variable_scope.variable_scope("attention_decoder", dtype=tf.float32):
+          with variable_scope.variable_scope("AttnOutputProjection"):
+            '''
+            input_weights = tf.reduce_sum(input_weights, axis=1)
+            model_input = tf.reduce_sum(model_input, axis=1) / input_weights
+            output = linear([model_input], vocab_size, True)
+            predictions = tf.nn.softmax(output)
+            '''
+            preds = []
+            for num_splits in [1, 3, 6, 12, 25, 30, 60, 100]:
+              splits = tf.split(model_input, num_or_size_splits=num_splits, axis=1)
+              splits_weights = tf.split(input_weights, num_or_size_splits=num_splits, axis=1)
+              for idx, split in enumerate(splits):
+                weight = splits_weights[idx]
+                nf = tf.reduce_sum(weight, axis=1)
+                nsum = tf.reduce_sum(nf, axis=1)
+                safe_sentinel = tf.ones((runtime_batch_size, input_size))
+
+                safe_nf = tf.where(tf.equal(nsum, 0), x=nf, y=safe_sentinel)
+
+                split = tf.reduce_sum(split, axis=1) / safe_nf
+                if not first:
+                  print(idx)
+                  tf.get_variable_scope().reuse_variables()
+                  first = False
+                output = linear([split], vocab_size, True)
+                pred = tf.nn.softmax(output)
+                pred = pred * tf.tile(nf[:, 0:1], [1, vocab_size])
+                preds.append(pred)
+            predictions = tf.add_n(preds)
     return {
         "predictions": predictions,
         "loss": loss,
