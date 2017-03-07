@@ -4,6 +4,7 @@ import tensorflow as tf
 from tensorflow.python.ops import variable_scope
 from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
+from tensorflow.python.ops import init_ops
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import nn_ops
 from tensorflow.python.ops import embedding_ops
@@ -12,6 +13,7 @@ from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl
 from tensorflow.python.util import nest
 
 import tensorflow.contrib.slim as slim
+import lstm_memnet_train
 
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
@@ -19,29 +21,13 @@ from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
 from yt8m.models import models
 import yt8m.models.model_utils as utils
 
-# linear = core_rnn_cell_impl._linear  # pylint: disable=protected-access
+linear = core_rnn_cell_impl._linear  # pylint: disable=protected-access
 
-def linear(args, output_size, bias, bias_start=0.0, reuse=False):
-  """Linear map: sum_i(args[i] * W[i]), where W[i] is a variable.
-
-  Args:
-    args: a 2D Tensor or a list of 2D, batch x n, Tensors.
-    output_size: int, second dimension of W[i].
-    bias: boolean, whether to add a bias term or not.
-    bias_start: starting value to initialize the bias; 0 by default.
-
-  Returns:
-    A 2D Tensor with shape [batch x output_size] equal to
-    sum_i(args[i] * W[i]), where W[i]s are newly created matrices.
-
-  Raises:
-    ValueError: if some of the arguments has unspecified or wrong shape.
-  """
+def _get_linear_vars(args, output_size, bias, bias_start=0.0):
   if args is None or (nest.is_sequence(args) and not args):
     raise ValueError("`args` must be specified")
   if not nest.is_sequence(args):
     args = [args]
-
   # Calculate the total size of arguments on dimension 1.
   total_arg_size = 0
   shapes = [a.get_shape() for a in args]
@@ -56,23 +42,33 @@ def linear(args, output_size, bias, bias_start=0.0, reuse=False):
 
   dtype = [a.dtype for a in args][0]
 
-  # Now the computation.
   scope = vs.get_variable_scope()
-  with vs.variable_scope(scope, reuse=reuse) as outer_scope:
+  with vs.variable_scope(scope) as outer_scope:
     weights = vs.get_variable(
         "weights", [total_arg_size, output_size], dtype=dtype)
+    with vs.variable_scope(outer_scope) as inner_scope:
+      inner_scope.set_partitioner(None)
+      biases = vs.get_variable(
+          "biases", [output_size],
+          dtype=dtype,
+          initializer=init_ops.constant_initializer(bias_start, dtype=dtype))
+  return weights, biases
+
+def _linear(args, weights, biases, bias):
+  if args is None or (nest.is_sequence(args) and not args):
+    raise ValueError("`args` must be specified")
+  if not nest.is_sequence(args):
+    args = [args]
+
+  # Now the computation.
+  scope = vs.get_variable_scope()
+  with vs.variable_scope(scope) as outer_scope:
     if len(args) == 1:
       res = math_ops.matmul(args[0], weights)
     else:
       res = math_ops.matmul(array_ops.concat(args, 1), weights)
     if not bias:
       return res
-    with vs.variable_scope(outer_scope, reuse=reuse) as inner_scope:
-      inner_scope.set_partitioner(None)
-      biases = vs.get_variable(
-          "biases", [output_size],
-          dtype=dtype,
-          initializer=init_ops.constant_initializer(bias_start, dtype=dtype))
     return nn_ops.bias_add(res, biases)
 
 def _extract_argmax_and_embed(embedding,
@@ -104,7 +100,7 @@ def _extract_argmax_and_embed(embedding,
 
   return loop_function
 
-def attention_decoder(decoder_inputs,
+def attention_decoder(self, decoder_inputs,
                       initial_state,
                       attention_states,
                       cell,
@@ -211,7 +207,8 @@ def attention_decoder(decoder_inputs,
 
       with variable_scope.variable_scope("AttnOutputProjection"):
         # output = linear([cell_output] + attns, output_size, True)
-        output = linear(attns, output_size, True)
+        # output = linear(attns, output_size, True)
+        output = _linear(attns, self.w, self.b, True)
       if loop_function is not None:
         prev = output
       outputs.append(output)
@@ -219,7 +216,7 @@ def attention_decoder(decoder_inputs,
   return outputs, state
 
 
-def embedding_attention_decoder(decoder_inputs,
+def embedding_attention_decoder(self, decoder_inputs,
                                 initial_state,
                                 attention_states,
                                 cell,
@@ -250,7 +247,7 @@ def embedding_attention_decoder(decoder_inputs,
     emb_inp = [
         embedding_ops.embedding_lookup(embedding, i) for i in decoder_inputs
     ]
-    return attention_decoder(
+    return attention_decoder(self,
         emb_inp,
         initial_state,
         attention_states,
@@ -275,7 +272,7 @@ class LSTMMemNet(models.BaseModel):
 
   def create_model(self, model_input, vocab_size, num_frames,
                    is_training=True, sparse_labels=None, label_weights=None,
-                   input_weights=None,
+                   input_weights=None, dense_labels=None,
                    **unused_params):
     input_size = 1024 + 128
     self.cell_size = input_size
@@ -285,64 +282,22 @@ class LSTMMemNet(models.BaseModel):
     input_weights = tf.tile(
         tf.expand_dims(input_weights, 2),
         [1, 1, input_size])
-    model_input = model_input * input_weights
+    self.model_input = model_input * input_weights
 
-    init_state = tf.reduce_sum(model_input, axis=1) / num_frames
-    dec_cell = core_rnn_cell.GRUCell(self.cell_size)
-    sparse_labels = tf.reshape(sparse_labels, [-1])
-    if is_training:
-      outputs, _ = embedding_attention_decoder([sparse_labels], initial_state=init_state,
-                                               attention_states=model_input,
-                                               cell=dec_cell,
-                                               num_symbols=vocab_size,
-                                               embedding_size=512,
-                                               num_heads=1,
-                                               output_size=vocab_size,
-                                               output_projection=None,
-                                               feed_previous=False,
-                                               dtype=tf.float32,
-                                               scope="LSTMMemNet")
-      logits = outputs[0]
-      loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=sparse_labels, logits=logits)
-      loss = tf.reduce_mean(loss)
-      predictions = tf.nn.softmax(logits)
-    else:
-      loss = tf.constant(0.0)
-      runtime_batch_size = tf.shape(model_input)[0]
-      first = True
-      with variable_scope.variable_scope("LSTMMemNet", dtype=tf.float32):
-        with variable_scope.variable_scope("attention_decoder", dtype=tf.float32):
-          with variable_scope.variable_scope("AttnOutputProjection"):
-            '''
-            input_weights = tf.reduce_sum(input_weights, axis=1)
-            model_input = tf.reduce_sum(model_input, axis=1) / input_weights
-            output = linear([model_input], vocab_size, True)
-            predictions = tf.nn.softmax(output)
-            '''
-            preds = []
-            for num_splits in [1, 3, 6, 12, 25, 30, 60, 100]:
-              splits = tf.split(model_input, num_or_size_splits=num_splits, axis=1)
-              splits_weights = tf.split(input_weights, num_or_size_splits=num_splits, axis=1)
-              for idx, split in enumerate(splits):
-                weight = splits_weights[idx]
-                nf = tf.reduce_sum(weight, axis=1)
-                nsum = tf.reduce_sum(nf, axis=1)
-                safe_sentinel = tf.ones((runtime_batch_size, input_size))
+    self.init_state = tf.reduce_sum(self.model_input, axis=1) / num_frames
+    self.dec_cell = core_rnn_cell.GRUCell(self.cell_size)
+    self.vocab_size = vocab_size
+    # TODO
+    self.sparse_labels = tf.reshape(sparse_labels, [-1])
+    predictions, loss = lstm_memnet_train.train(self, decoder_fn=embedding_attention_decoder)
 
-                safe_nf = tf.where(tf.equal(nsum, 0), x=nf, y=safe_sentinel)
-
-                split = tf.reduce_sum(split, axis=1) / safe_nf
-                if not first:
-                  print(idx)
-                  tf.get_variable_scope().reuse_variables()
-                output = linear([split], vocab_size, True, reuse=not first)
-                if not first:
-                  first = False
-                pred = tf.nn.softmax(output)
-                pred = pred * tf.tile(nf[:, 0:1], [1, vocab_size])
-                preds.append(pred)
-            predictions = tf.add_n(preds)
     return {
         "predictions": predictions,
         "loss": loss,
     }
+
+  def _get_vars(self, model_input, vocab_size):
+    with variable_scope.variable_scope("LSTMMemNet", dtype=tf.float32):
+      with variable_scope.variable_scope("attention_decoder", dtype=tf.float32):
+        with variable_scope.variable_scope("AttnOutputProjection"):
+          return _get_linear_vars([tf.reduce_sum(model_input, axis=1)], vocab_size, True,)

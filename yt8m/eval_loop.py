@@ -70,13 +70,24 @@ def evaluation_loop(self, saver, model_ckpt_path):
             predictions, res["dense_labels"], res["loss"])
         iteration_info_dict["examples_per_second"] = example_per_second
 
+        gap = eval_util.calculate_gap(predictions, res["dense_labels"])
         iterinfo = utils.AddGlobalStepSummary(
             summary_writer,
             global_step_val,
             iteration_info_dict,
             summary_scope="Eval")
-        logging.info("examples_processed: %d | %s", examples_processed,
-                     iterinfo)
+        '''
+        p = [str(_) for _ in np.where(res["dense_labels"][0, :] > 0)[0].tolist()]
+        print_labels = "+".join(p)
+        p = np.argsort(res["predictions"][0, :])[-20:]
+        p = np.sort(p).tolist()
+        p = [str(_) for _ in p]
+        pred_labels = "+".join(p)
+        logging.info("vid: %s; gap: %s; labels %s; predictions %s" % (
+            res['video_id'][0], gap, print_labels, pred_labels))
+        '''
+        logging.info("examples_processed: %d | %s | gap: %s", examples_processed,
+                     iterinfo, gap)
 
     except tf.errors.OutOfRangeError as e:
       logging.info(
