@@ -293,10 +293,10 @@ class LSTMMemNet(models.BaseModel):
     self.dec_cell = core_rnn_cell.GRUCell(self.cell_size)
     self.vocab_size = vocab_size
     # TODO
-    self.sparse_labels = sparse_labels
-    self.target_labels = label_weights
-    # self.sparse_labels = tf.reshape(sparse_labels, [-1])
-    # self.target_labels = tf.reshape(label_weights, [-1])
+    # self.sparse_labels = sparse_labels
+    # self.target_labels = label_weights
+    self.sparse_labels = tf.reshape(sparse_labels, [-1])
+    self.target_labels = tf.reshape(label_weights, [-1])
     if is_training:
       predictions, loss = lstm_memnet_train.train(self, decoder_fn=embedding_attention_decoder)
     else:
@@ -313,4 +313,5 @@ class LSTMMemNet(models.BaseModel):
     with variable_scope.variable_scope("LSTMMemNet", dtype=tf.float32):
       with variable_scope.variable_scope("attention_decoder", dtype=tf.float32):
         with variable_scope.variable_scope("AttnOutputProjection"):
-          return _get_linear_vars([tf.reduce_sum(model_input, axis=1)], vocab_size, True,)
+          return _get_linear_vars(model_input, vocab_size, True,)
+          # return _get_linear_vars([tf.reduce_sum(model_input, axis=1)], vocab_size, True,)

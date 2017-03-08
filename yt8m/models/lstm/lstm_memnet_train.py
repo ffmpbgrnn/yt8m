@@ -7,7 +7,7 @@ def step(self, decoder_fn, sparse_labels):
                           cell=self.dec_cell,
                           num_symbols=self.vocab_size,
                           embedding_size=512,
-                          num_heads=4,
+                          num_heads=self.num_heads,
                           output_size=self.vocab_size+offset,
                           output_projection=None,
                           feed_previous=False,
@@ -16,6 +16,8 @@ def step(self, decoder_fn, sparse_labels):
   return outputs
 
 def train(self, decoder_fn):
+  self.num_heads = 4
+  self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
   outputs = step(self, decoder_fn, self.sparse_labels)
   logits = outputs[0]
   loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=self.target_labels, logits=logits)
@@ -24,10 +26,11 @@ def train(self, decoder_fn):
   return predictions, loss
 
 def eval0(self, decoder_fn, linear_fn):
-  self.w, self.b = self._get_vars([self.init_state], self.vocab_size+offset)
-  output = linear_fn([self.init_state], self.w, self.b, True)[:, :self.vocab_size]
+  self.num_heads = 4
+  self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
+  output = linear_fn([self.init_state] * self.num_heads, self.w, self.b, True)[:, :self.vocab_size]
   _, top_idxs = tf.nn.top_k(
-      output, k=40, name='nn_topk')
+      output, k=20, name='nn_topk')
 
   loss = tf.constant(0.0)
   sparse_labels = tf.unstack(top_idxs, axis=1)
@@ -46,8 +49,9 @@ def eval0(self, decoder_fn, linear_fn):
   return predictions, loss
 
 def eval1(self, decoder_fn, linear_fn):
-  self.w, self.b = self._get_vars([self.init_state], self.vocab_size+offset)
-  output = linear_fn([self.init_state], self.w, self.b, True)
+  self.num_heads = 4
+  self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
+  output = linear_fn([self.init_state] * self.num_heads, self.w, self.b, True)
   predictions = tf.nn.softmax(output)[:, :self.vocab_size]
   loss = tf.constant(0.0)
   return predictions, loss
