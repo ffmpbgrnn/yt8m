@@ -163,6 +163,7 @@ class YT8MFrameFeatureReader(BaseReader):
     self.pad_id = self.num_classes
     self.sos_id = self.num_classes + 1
     self.eos_id = self.num_classes + 2
+    self.classes = set(range(self.num_classes))
 
   def get_video_matrix(self,
                        features,
@@ -245,9 +246,17 @@ class YT8MFrameFeatureReader(BaseReader):
 
     def random_pick_one(x):
       x = x.tolist()
-      idx = np.random.randint(len(x))
-      x = [x[idx],]
-      w = [1,]
+      # TODO
+      if np.random.randint(5) == 0:
+        exclude_x = list(self.classes - set(x))
+        x = [exclude_x[np.random.randint(len(exclude_x))],]
+        w = [self.num_classes + x[0]]
+        # w = [1,]
+      else:
+        idx = np.random.randint(len(x))
+        x = [x[idx],]
+        w = x
+        # w = [1,]
       return (x, w)
 
     # read ground truth labels

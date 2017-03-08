@@ -164,6 +164,8 @@ def attention_decoder(self, decoder_inputs,
           s = math_ops.reduce_sum(v[a] * math_ops.tanh(hidden_features[a] + y),
                                   [2, 3])
           a = nn_ops.softmax(s)
+          # a = tf.Print(a, [tf.nn.top_k(a, k=20)[0]])
+          # a = tf.Print(a, [tf.nn.top_k(a, k=20)[1]])
           # Now calculate the attention-weighted vector d.
           d = math_ops.reduce_sum(
               array_ops.reshape(a, [-1, attn_length, 1, 1]) * hidden, [1, 2])
@@ -207,6 +209,7 @@ def attention_decoder(self, decoder_inputs,
 
       with variable_scope.variable_scope("AttnOutputProjection"):
         # output = linear([cell_output] + attns, output_size, True)
+        # TODO
         # output = linear(attns, output_size, True)
         output = _linear(attns, self.w, self.b, True)
       if loop_function is not None:
@@ -274,22 +277,32 @@ class LSTMMemNet(models.BaseModel):
                    is_training=True, sparse_labels=None, label_weights=None,
                    input_weights=None, dense_labels=None,
                    **unused_params):
-    input_size = 1024 + 128
-    self.cell_size = input_size
-    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+    self.input_size = 1024 + 128
+    self.cell_size = self.input_size
+    self.num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
     # model_input = utils.SampleRandomSequence(model_input, num_frames,
                                              # self.max_steps)
-    input_weights = tf.tile(
+    self.input_weights_2d = input_weights
+    self.input_weights = tf.tile(
         tf.expand_dims(input_weights, 2),
-        [1, 1, input_size])
-    self.model_input = model_input * input_weights
+        [1, 1, self.input_size])
+    self.model_input = model_input * self.input_weights
 
-    self.init_state = tf.reduce_sum(self.model_input, axis=1) / num_frames
+    self.runtime_batch_size = tf.shape(self.model_input)[0]
+    self.init_state = tf.reduce_sum(self.model_input, axis=1) / self.num_frames
     self.dec_cell = core_rnn_cell.GRUCell(self.cell_size)
     self.vocab_size = vocab_size
     # TODO
-    self.sparse_labels = tf.reshape(sparse_labels, [-1])
-    predictions, loss = lstm_memnet_train.train(self, decoder_fn=embedding_attention_decoder)
+    self.sparse_labels = sparse_labels
+    self.target_labels = label_weights
+    # self.sparse_labels = tf.reshape(sparse_labels, [-1])
+    # self.target_labels = tf.reshape(label_weights, [-1])
+    if is_training:
+      predictions, loss = lstm_memnet_train.train(self, decoder_fn=embedding_attention_decoder)
+    else:
+      predictions, loss = lstm_memnet_train.eval(self,
+                                                 decoder_fn=embedding_attention_decoder,
+                                                 linear_fn=_linear)
 
     return {
         "predictions": predictions,
