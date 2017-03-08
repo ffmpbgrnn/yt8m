@@ -11,9 +11,11 @@ from yt8m.models.lstm import lstm
 from yt8m.models.lstm import lstm_enc_dec
 from yt8m.models.lstm import skip_thought
 from yt8m.models.lstm import lstm_memnet
+from yt8m.models.label_bias import binary_cls
 from yt8m.data_io import readers
 from yt8m.data_io import vlad_reader
 from yt8m.data_io import hdfs_reader
+from yt8m.data_io import hdfs_reader_bias
 import utils
 from .config import base as base_config
 import models.conv.train as conv_train
@@ -46,22 +48,23 @@ class Expr(object):
 
     self.model = utils.find_class_by_name(self.config.model_name,
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
-         lstm_memnet, conv_train])()
+         lstm_memnet, conv_train, binary_cls])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
         self.model.optimizer_name, [tf.train])
 
-    self.num_classes = 4716
     # convert feature_names and feature_sizes to lists of values
     self.feature_names, self.feature_sizes = utils.GetListOfFeatureNamesAndSizes(
         self.config.feature_names, self.config.feature_sizes)
     if self.config.use_hdfs:
-      inputs = hdfs_reader.enqueue_data(self.batch_size, self.num_classes, sum(self.feature_sizes))
+      inputs = hdfs_reader_bias.enqueue_data(self.batch_size, self.model.num_classes, sum(self.feature_sizes))
       video_id_batch, dense_labels_batch, model_input_raw = inputs
       sparse_labels_batch, num_frames, label_weights_batch = None, None, None
+      input_weights_batch = None
       inputs = video_id_batch, model_input_raw, dense_labels_batch, \
-                sparse_labels_batch, num_frames, label_weights_batch
+               sparse_labels_batch, num_frames, label_weights_batch, \
+               input_weights_batch
     else:
       inputs = self.get_input_data_tensors(
           self.config.data_pattern,
@@ -157,7 +160,7 @@ class Expr(object):
         result = self.model.create_model(
             model_input,
             num_frames=num_frames,
-            vocab_size=self.num_classes,
+            vocab_size=self.model.num_classes,
             dense_labels=dense_labels_batch,
             sparse_labels=sparse_labels_batch,
             label_weights=label_weights_batch,

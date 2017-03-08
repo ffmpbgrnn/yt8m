@@ -12,9 +12,10 @@ import yt8m.models.model_utils as utils
 
 class BinaryLogisticModel(models.BaseModel):
   def __init__(self):
-    super(LSTMEncDec, self).__init__()
+    super(BinaryLogisticModel, self).__init__()
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
+    self.num_classes = 1
 
   def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):

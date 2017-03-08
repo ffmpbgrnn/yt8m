@@ -29,7 +29,7 @@ def restore(saver, sess, train_dir):
 
 def evaluation_loop(self, saver, model_ckpt_path):
   global_step_val = model_ckpt_path.split("/")[-1].split("-")[-1]
-  evl_metrics = eval_util.EvaluationMetrics(self.num_classes, self.config.top_k)
+  evl_metrics = eval_util.EvaluationMetrics(self.model.num_classes, self.config.top_k)
 
   # summary_writer = tf.summary.FileWriter(
       # self.train_dir, graph=tf.get_default_graph())
