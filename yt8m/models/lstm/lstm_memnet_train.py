@@ -30,7 +30,7 @@ def eval0(self, decoder_fn, linear_fn):
   self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
   output = linear_fn([self.init_state] * self.num_heads, self.w, self.b, True)[:, :self.vocab_size]
   _, top_idxs = tf.nn.top_k(
-      output, k=20, name='nn_topk')
+      output, k=10, name='nn_topk')
 
   loss = tf.constant(0.0)
   sparse_labels = tf.unstack(top_idxs, axis=1)
@@ -42,6 +42,7 @@ def eval0(self, decoder_fn, linear_fn):
     outputs = step(self, decoder_fn, sp_label)
     logits = outputs[0]
     pred = tf.nn.softmax(logits)[:, :self.vocab_size]
+    pred = tf.nn.softmax(pred)
     # pred = tf.where(tf.equal(tf.cast(sp_label, dtype=tf.int64), tf.argmax(pred, axis=1)), pred, check_integraty)
     predictions.append(pred)
   predictions = tf.reduce_max(tf.stack(predictions, axis=2), axis=2)
@@ -53,12 +54,14 @@ def eval1(self, decoder_fn, linear_fn):
   self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
   output = linear_fn([self.init_state] * self.num_heads, self.w, self.b, True)
   predictions = tf.nn.softmax(output)[:, :self.vocab_size]
+  predictions = tf.nn.softmax(predictions)
   loss = tf.constant(0.0)
   return predictions, loss
 
 def eval2(self, decoder_fn, linear_fn):
   preds = []
-  self.w, self.b = self._get_vars([self.init_state], self.vocab_size+offset)
+  self.num_heads = 4
+  self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
   one_sentinel = tf.ones((self.runtime_batch_size, 1))
   zero_sentinel = tf.zeros((self.runtime_batch_size, 1))
   # for num_splits in [1, 3, 6, 12, 25, 30, 60, 100]:
@@ -72,7 +75,7 @@ def eval2(self, decoder_fn, linear_fn):
 
       safe_nf = tf.where(tf.equal(nsum, 0), x=one_sentinel, y=nf)
       split = tf.reduce_sum(split, axis=1) / safe_nf
-      output = linear_fn([split], self.w, self.b, True)
+      output = linear_fn([split] * self.num_heads, self.w, self.b, True)
       pred = tf.nn.softmax(output)[:, :self.vocab_size]
       # nf = tf.Print(nf, [nf[:, 0:1]])
 
@@ -87,8 +90,9 @@ def eval2(self, decoder_fn, linear_fn):
   # predictions = tf.add_n(preds)
 
 def eval3(self, decoder_fn, linear_fn):
+  self.num_heads = 4
   sparse_labels = tf.unstack(self.sparse_labels, axis=1)
-  self.w, self.b = self._get_vars([self.init_state], self.vocab_size+offset)
+  self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
   preds = []
   check_inta = tf.zeros((self.runtime_batch_size, self.vocab_size), dtype=tf.float32)
   for i, sp_label in enumerate(sparse_labels):
@@ -101,6 +105,23 @@ def eval3(self, decoder_fn, linear_fn):
   predictions = tf.reduce_max(tf.stack(preds, axis=2), axis=2)[:, :self.vocab_size]
   loss = tf.constant(0.0)
   return predictions, loss
+
+def eval4(self, decoder_fn, linear_fn):
+  self.num_heads = 4
+  self.w, self.b = self._get_vars([self.init_state] * self.num_heads, self.vocab_size+offset)
+  output = linear_fn([self.init_state] * self.num_heads, self.w, self.b, True)[:, :self.vocab_size]
+
+  runtime_batch_size = tf.shape(self.model_input)[0]
+  sparse_labels = tf.zeros([runtime_batch_size], dtype=tf.int64)
+
+  predictions = []
+  outputs = step(self, decoder_fn, sparse_labels)
+  logits = outputs[0]
+  pred = tf.nn.softmax(logits)[:, :self.vocab_size]
+  pred = tf.nn.softmax(pred)
+  # pred = tf.where(tf.equal(tf.cast(sp_label, dtype=tf.int64), tf.argmax(pred, axis=1)), pred, check_integraty)
+  loss = tf.constant(0.0)
+  return pred, loss
 
 def train0(self):
   if is_training or True:
@@ -139,4 +160,4 @@ def train0(self):
       loss = tf.constant(0.0)
       predictions = tf.reduce_max(tf.stack(predictions, axis=2), axis=2)
 
-eval = eval0
+eval = eval4

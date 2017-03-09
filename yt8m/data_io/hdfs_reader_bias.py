@@ -5,7 +5,6 @@ import cPickle as pkl
 import random
 import numpy as np
 import Queue
-from sklearn.preprocessing import normalize
 
 import tensorflow as tf
 from tensorflow.python.training import queue_runner
@@ -14,26 +13,39 @@ from . import feeding_queue_runner as fqr
 
 
 class Feed_fn_setup(object):
+  def load_video_info(self, stage="train", mem_map=False):
+    vid_dict = {}
+    with open("/data/state/linchao/YT/video_hdfs/{}/mean.pkl".format(stage)) as fin:
+      vid_list = pkl.load(fin)
+      for i, vid in enumerate(vid_list):
+        vid_dict[vid] = i
+    if mem_map:
+      mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/{}/mean.h5".format(stage), 'r', driver='core')['feas']
+    else:
+      mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/{}/mean.h5".format(stage), 'r')['feas']
+    return vid_dict, mean_data
+
+  def load_vlad_info(self, stage="train", mem_map=False):
+    vid_dict = {}
+    with open("/data/state/linchao/YT/vlad_hdfs/{}/mean.pkl") as fin:
+      vid_list = pkl.load(fin)
+      for i, vid in enumerate(vid_list):
+        vid_dict[vid] = i
+    mean_data = h5py.File("/data/state/linchao/YT/vlad_hdfs/{}/mean.h5", 'r')['feas']
+    return vid_dict, mean_data
+
   def __init__(self, num_classes, phase_train, num_threads):
     self.num_threads = num_threads
     self.phase_train = phase_train
     if self.phase_train:
-      self.vid_dict = {}
-      self.mean_data_list = []
-      for split_idx in xrange(160):
-        print(split_idx)
-        with open("/data/D2DCRC/linchao/YT/vlad_feas_256_256_nonorm/train_array/feas_{}.pkl".format(split_idx)) as fin:
-          vid_list = pkl.load(fin)
-          for vid_idx, vid in enumerate(vid_list):
-            self.vid_dict[vid] = (split_idx, vid_idx)
-        self.mean_data_list.append(
-            h5py.File("/data/D2DCRC/linchao/YT/vlad_feas_256_256_nonorm/train_array/feas_{}.h5".format(split_idx), 'r')['feas'])
-
+      self.vid_dict, self.mean_data = self.load_vlad_info("train")
       print("loading vid info")
       with open("/data/uts700/linchao/yt8m/YT/data/vid_info/train_vid_to_labels_-1.pkl") as fin:
         self.vid_to_labels = pkl.load(fin)
     else:
-      pass
+      self.vid_dict, self.mean_data = self.load_vlad_info("validate")
+      with open("/data/uts700/linchao/yt8m/YT/data/vid_info/validate_vid_to_labels.pkl") as fin:
+        self.vid_to_labels = pkl.load(fin)
 
     target_label = 0
     self.pos_vids, self.neg_vids = [], []
@@ -127,14 +139,20 @@ class Feed_fn(object):
       raise errors.OutOfRangeError(None, None,
                                    "Already emitted epochs.")
     vids, dense_labels = ins
-    batch_data = np.zeros((len(vids), 256*256), dtype=np.float32)
+    vid_index = []
     for vid_idx, vid in enumerate(vids):
-      fidx, inside_f_idx = self.vid_dict[vid]
-      d = self._i.mean_data_list[fidx][inside_f_idx, :]
-      d = np.reshape(d, [256, 256])
-      d = np.sign(d) * np.sqrt(np.absolute(d))
-      d = normalize(d)
-      batch_data[vid_idx] = np.reshape(d, [-1])
+      idx = self.vid_dict[vid]
+      vid_index.append(idx)
+
+    vid_index = np.array(vid_index)
+    vid_index_sortidx = np.argsort(vid_index)
+    try:
+      batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
+    except:
+      print(vid_index[vid_index_sortidx])
+      print(vids)
+      print("\n")
+    batch_data = batch_data[np.argsort(vid_index_sortidx), :]
 
     vals = [np.array(vids), dense_labels, batch_data]
     feed_dict = {}
