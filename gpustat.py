@@ -32,6 +32,10 @@ def main(hostname, mem_percent):
     gpu_id_mapping = {
         0: 0,
         1: 1,}
+  elif hostname == "UTS1":
+    gpu_id_mapping = {
+        0: 0,
+        1: 1,}
   elif hostname == "UTS3":
     gpu_id_mapping = {
         0: 0,
@@ -80,7 +84,8 @@ def get_available_gpu(gpu_id_mapping, stats, mem_percent):
     estimate_memory = int(int(gpu['memory.total']) * mem_percent)
     if 1. * int(gpu['memory.used']) < estimate_memory and int(gpu['temperature.gpu']) < 80:
       gpu_id = int(gpu['index'])
-      gpus.append(gpu_id_mapping[gpu_id])
+      if gpu_id in gpu_id_mapping.keys():
+        gpus.append(gpu_id_mapping[gpu_id])
   return gpus
 
 
