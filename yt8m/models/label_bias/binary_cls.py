@@ -16,6 +16,7 @@ class BinaryLogisticModel(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
     self.num_classes = 1
+    self.normalize_input = True
 
   def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
