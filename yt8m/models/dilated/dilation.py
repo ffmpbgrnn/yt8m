@@ -18,7 +18,7 @@ class Dilation(models.BaseModel):
     super(Dilation, self).__init__()
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-3
-    self.num_classes = 1
+    # self.num_classes = 1
     self.normalize_input = True
 
   def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
