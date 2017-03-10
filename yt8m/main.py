@@ -59,7 +59,7 @@ class Expr(object):
     self.feature_names, self.feature_sizes = utils.GetListOfFeatureNamesAndSizes(
         self.config.feature_names, self.config.feature_sizes)
     if self.config.use_hdfs:
-      inputs = hdfs_reader_bias.enqueue_data(self.batch_size, self.model.num_classes, sum(self.feature_sizes))
+      inputs = hdfs_reader_bias.enqueue_data(self.phase_train, self.batch_size, self.model.num_classes, sum(self.feature_sizes))
       video_id_batch, dense_labels_batch, model_input_raw = inputs
       sparse_labels_batch, num_frames, label_weights_batch = None, None, None
       input_weights_batch = None
