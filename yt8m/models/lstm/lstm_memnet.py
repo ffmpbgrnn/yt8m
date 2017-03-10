@@ -271,7 +271,7 @@ class LSTMMemNet(models.BaseModel):
     self.base_learning_rate = 3e-4
 
     self.max_steps = 300
-    self.num_max_labels = 1
+    self.num_max_labels = 10
 
   def create_model(self, model_input, vocab_size, num_frames,
                    is_training=True, sparse_labels=None, label_weights=None,
@@ -293,10 +293,12 @@ class LSTMMemNet(models.BaseModel):
     self.dec_cell = core_rnn_cell.GRUCell(self.cell_size)
     self.vocab_size = vocab_size
     # TODO
-    # self.sparse_labels = sparse_labels
-    # self.target_labels = label_weights
-    self.sparse_labels = tf.reshape(sparse_labels, [-1])
-    self.target_labels = tf.reshape(label_weights, [-1])
+    if self.num_max_labels == 1:
+      self.sparse_labels = tf.reshape(sparse_labels, [-1])
+      self.target_labels = tf.reshape(label_weights, [-1])
+    else:
+      self.sparse_labels = sparse_labels
+      self.target_labels = label_weights
     if is_training:
       predictions, loss = lstm_memnet_train.train(self, decoder_fn=embedding_attention_decoder)
     else:

@@ -62,5 +62,7 @@ class YT8MVLADFeatureReader(BaseReader):
     batch_sparse_labels = tf.expand_dims(sparse_labels, 0)
     batch_label_weights = tf.expand_dims(weights, 0)
     batch_frames = tf.expand_dims(num_frames, 0)
+    batch_input_weights = batch_label_weights
 
-    return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, batch_frames, batch_label_weights
+    # batch_dense_labels = batch_dense_labels[:, 0: 1]
+    return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, batch_frames, batch_label_weights, batch_input_weights

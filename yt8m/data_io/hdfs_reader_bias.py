@@ -1,4 +1,5 @@
 import h5py
+import time
 import math
 import threading
 import cPickle as pkl
@@ -25,13 +26,13 @@ class Feed_fn_setup(object):
       mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/{}/mean.h5".format(stage), 'r')['feas']
     return vid_dict, mean_data
 
-  def load_vlad_info(self, stage="train", mem_map=False):
+  def load_vlad_info(self, stage="train"):
     vid_dict = {}
-    with open("/data/state/linchao/YT/vlad_hdfs/{}/mean.pkl") as fin:
+    with open("/data/state/linchao/YT/vlad_hdfs/{}/mean.pkl".format(stage)) as fin:
       vid_list = pkl.load(fin)
       for i, vid in enumerate(vid_list):
         vid_dict[vid] = i
-    mean_data = h5py.File("/data/state/linchao/YT/vlad_hdfs/{}/mean.h5", 'r')['feas']
+    mean_data = h5py.File("/data/state/linchao/YT/vlad_hdfs/{}/mean.h5".format(stage), 'r')['feas']
     return vid_dict, mean_data
 
   def __init__(self, num_classes, phase_train, num_threads):
@@ -59,7 +60,7 @@ class Feed_fn_setup(object):
     random.shuffle(self.neg_vids)
 
     self.num_classes = num_classes
-    self.batch_size = 32
+    self.batch_size = 16
 
     self.batch_id_queue = Queue.Queue(1500)
     if self.phase_train:
@@ -152,6 +153,7 @@ class Feed_fn(object):
       print(vid_index[vid_index_sortidx])
       print(vids)
       print("\n")
+
     batch_data = batch_data[np.argsort(vid_index_sortidx), :]
 
     vals = [np.array(vids), dense_labels, batch_data]
@@ -160,8 +162,7 @@ class Feed_fn(object):
       feed_dict[pl.name] = val
     return feed_dict
 
-def enqueue_data(batch_size, num_classes, feature_size, name="enqueue_input",):
-  phase_train = True
+def enqueue_data(phase_train, batch_size, num_classes, feature_size, name="enqueue_input",):
   num_threads = 8
   fn_setup = Feed_fn_setup(num_classes, phase_train, num_threads)
   queue_types = [tf.string, tf.int64, tf.float32]
