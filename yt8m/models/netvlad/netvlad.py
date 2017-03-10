@@ -6,7 +6,6 @@ import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
-from tensorflow.contrib.layers.python.layers import regularizers
 
 from yt8m.models import models
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl
@@ -28,19 +27,24 @@ class NetVLAD(models.BaseModel):
                    is_training=True, sparse_labels=None, label_weights=None,
                    dense_labels=None, input_weights=None, **unused_params):
     vlad_att_hidden_size = 100
-    fea_size = 1024+128
-    C = 10
-    input_size = tf.shape(model_input)[-1]
+    C = 20
     loss_with_vlad_kmeans = True
+
+    input_size = 1024+128#tf.shape(model_input)[-1]
+    fea_size = 256
+    model_input = tf.reshape(model_input, [-1, self.max_steps, 1, input_size])
+    model_input = slim.conv2d(model_input, fea_size, [1, 1], activation_fn=None, scope="input_proj")
+    model_input = tf.reshape(model_input, [-1, self.max_steps, fea_size])
     input_weights = tf.tile(
         tf.expand_dims(input_weights, 2),
-        [1, 1, input_size])
+        [1, 1, fea_size])
     inputs = model_input * input_weights
 
+
     with tf.variable_scope("centers"):
-      center = tf.get_variable("center", [1, C, 1, fea_size],
+      center = tf.get_variable("center", shape=[1, C, 1, fea_size], dtype=tf.float32,
                                initializer=tf.truncated_normal_initializer(stddev=0.01),
-                               regularizer=regularizers.l2_regularizer(1e-5))
+                               regularizer=slim.l2_regularizer(1e-5))
     hidden = slim.conv2d(center, vlad_att_hidden_size, [1, 1], activation_fn=None, scope="hidden_conv2d")
 
     v = tf.get_variable("attn_v", [1, 1, 1, vlad_att_hidden_size],
@@ -64,7 +68,7 @@ class NetVLAD(models.BaseModel):
       if is_training and loss_with_vlad_kmeans:
         l2_loss = tf.reduce_mean(
             tf.reduce_sum(d * d, axis=3))
-      d = tf.reshape(d, [-1, self.max_steps, fea_size])
+      d = tf.reshape(d, [-1, self.max_steps, C, fea_size])
       d = tf.reduce_sum(d, axis=1)
     residual = d
 
@@ -92,25 +96,26 @@ class NetVLAD(models.BaseModel):
         total_loss_ /= seq_length
     '''
     outputs = self.normalization(residual, C * fea_size, ssr=True,
-                                 intra_norm=True, l2_norm=True, norm_dim=3)
+                                 intra_norm=True, l2_norm=True, norm_dim=2)
     logits = slim.fully_connected(
         outputs, vocab_size, activation_fn=None,
         weights_regularizer=slim.l2_regularizer(1e-8))
 
     labels = tf.cast(dense_labels, tf.float32)
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
     return {
         "predictions": tf.nn.sigmoid(logits),
         "loss": loss + l2_loss * 1e-8,
     }
 
-  def normalization(outputs, output_size, ssr=True, intra_norm=True, l2_norm=True, norm_dim=2):
+  def normalization(self, outputs, output_size, ssr=True, intra_norm=True, l2_norm=True, norm_dim=2):
     if ssr:
-        outputs = tf.sign(outputs) * tf.sqrt(tf.abs(outputs) + 1e-12)
+      outputs = tf.sign(outputs) * tf.sqrt(tf.abs(outputs) + 1e-12)
     if intra_norm:
-        outputs = tf.nn.l2_normalize(outputs, norm_dim)
+      outputs = tf.nn.l2_normalize(outputs, norm_dim)
 
     outputs = tf.reshape(outputs, [-1, output_size])
     if l2_norm:
-        outputs = tf.nn.l2_normalize(outputs, [1])
+      outputs = tf.nn.l2_normalize(outputs, [1])
     return outputs
