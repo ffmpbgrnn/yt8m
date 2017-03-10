@@ -35,12 +35,27 @@ class BaseConfig(object):
         "SkipThought",
         "Inception",
         "LSTMMemNet",
+        "BinaryLogisticModel",
+        "Dilation",
+        "NetVLAD",
     ]
-    self.model_name = "LSTMMemNet"
     self.label_smoothing = False
-    self.input_feat_type = "frame"
-    self.use_hdfs = False
-    # self.model_name = "LSTMEncDec"
+    # self.model_name = "NetVLAD"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+
+    # self.model_name = "Dilation"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+
+    self.model_name = "BinaryLogisticModel"
+    self.input_feat_type = "video"
+    self.use_hdfs = True
+
+    # self.model_name = "LSTMMemNet"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"
       self.feature_sizes = "1024, 128"

@@ -14,7 +14,7 @@ from . import feeding_queue_runner as fqr
 
 
 class Feed_fn_setup(object):
-  def load_video_info(self, stage="train", mem_map=False):
+  def load_video_info(self, stage="train", mem_map=True):
     vid_dict = {}
     with open("/data/state/linchao/YT/video_hdfs/{}/mean.pkl".format(stage)) as fin:
       vid_list = pkl.load(fin)
@@ -35,18 +35,22 @@ class Feed_fn_setup(object):
     mean_data = h5py.File("/data/state/linchao/YT/vlad_hdfs/{}/mean.h5".format(stage), 'r')['feas']
     return vid_dict, mean_data
 
-  def __init__(self, num_classes, phase_train, num_threads):
+  def __init__(self, feat_type, num_classes, phase_train, num_threads):
     self.num_threads = num_threads
     self.phase_train = phase_train
     if self.phase_train:
-      self.vid_dict, self.mean_data = self.load_vlad_info("train")
+      stage = "train"
       print("loading vid info")
       with open("/data/uts700/linchao/yt8m/YT/data/vid_info/train_vid_to_labels_-1.pkl") as fin:
         self.vid_to_labels = pkl.load(fin)
     else:
-      self.vid_dict, self.mean_data = self.load_vlad_info("validate")
+      stage = "validate"
       with open("/data/uts700/linchao/yt8m/YT/data/vid_info/validate_vid_to_labels.pkl") as fin:
         self.vid_to_labels = pkl.load(fin)
+    if feat_type == "video":
+      self.vid_dict, self.mean_data = self.load_video_info(stage)
+    elif feat_type == "vlad":
+      self.vid_dict, self.mean_data = self.load_vlad_info(stage)
 
     target_label = 0
     self.pos_vids, self.neg_vids = [], []
@@ -162,9 +166,9 @@ class Feed_fn(object):
       feed_dict[pl.name] = val
     return feed_dict
 
-def enqueue_data(phase_train, batch_size, num_classes, feature_size, name="enqueue_input",):
+def enqueue_data(feat_type, phase_train, batch_size, num_classes, feature_size, name="enqueue_input",):
   num_threads = 8
-  fn_setup = Feed_fn_setup(num_classes, phase_train, num_threads)
+  fn_setup = Feed_fn_setup(feat_type, num_classes, phase_train, num_threads)
   queue_types = [tf.string, tf.int64, tf.float32]
   queue_shapes = [(), (num_classes,), (feature_size,)]
   capacity = 1500
