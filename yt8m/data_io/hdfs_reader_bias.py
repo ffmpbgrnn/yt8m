@@ -64,7 +64,7 @@ class Feed_fn_setup(object):
     random.shuffle(self.neg_vids)
 
     self.num_classes = num_classes
-    self.batch_size = 16
+    self.batch_size = 32
 
     self.batch_id_queue = Queue.Queue(1500)
     if self.phase_train:
@@ -91,6 +91,19 @@ class Feed_fn_setup(object):
       self.batch_id_queue.put(False)
 
   def input_vid_threads_train(self):
+    vinfo = zip(self.pos_vids + self.neg_vids, [1 for _ in xrange(len(self.pos_vids))] + [0 for _ in xrange(len(self.neg_vids))])
+    random.shuffle(vinfo)
+    ptr = 0
+    num_vs = len(vinfo)
+    while True:
+      batch_vids, dense_labels = zip(*vinfo[ptr: ptr + self.batch_size])
+      self.batch_id_queue.put((batch_vids, np.reshape(np.array(dense_labels), [-1, 1])))
+      ptr += self.batch_size
+      if ptr >= num_vs:
+        ptr = 0
+        random.shuffle(vinfo)
+
+  def input_vid_threads_train_keep_ratio(self):
     pos_vid_ptr, neg_vid_ptr = 0, 0
     batch_vids = []
     dense_labels = np.zeros((self.batch_size, 1), dtype=np.int64)
