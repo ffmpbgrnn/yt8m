@@ -19,7 +19,8 @@ class BinaryLogisticModel(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
     self.num_classes = 1
-    self.normalize_input = False
+    # TODO
+    self.normalize_input = True
     self.use_vlad = True
 
   def create_model_matrix(self, model_input, vocab_size, l2_penalty=1e-5,
@@ -64,6 +65,18 @@ class BinaryLogisticModel(models.BaseModel):
     return {"predictions": preds, "loss": loss}
 
   def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
+                   is_training=True, dense_labels=None, **unused_params):
+    l2_penalty = 1e-8
+    logits = slim.fully_connected(
+        model_input, 1, activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty))
+    labels = tf.cast(dense_labels, tf.float32)
+    loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+    preds = tf.nn.sigmoid(logits)
+    return {"predictions": preds, "loss": loss}
+
+  def create_model_vlad(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
     '''
     output = slim.fully_connected(
