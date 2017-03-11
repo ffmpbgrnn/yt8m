@@ -41,10 +41,12 @@ def evaluation_loop(self, saver, model_ckpt_path):
   sess_config = tf.ConfigProto()
   sess_config.gpu_options.per_process_gpu_memory_fraction = 0.9
   video_ids = []
-  video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.val.pkl".format(model_id)
-  pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.val.h5".format(model_id), "w")
-  pred_dataset = pred_out.create_dataset('scores', shape=(1401828, 4716),
-                                          dtype=np.float32)
+  output_scores = False
+  if output_scores:
+    video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.val.pkl".format(model_id)
+    pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.val.h5".format(model_id), "w")
+    pred_dataset = pred_out.create_dataset('scores', shape=(1401828, 4716),
+                                            dtype=np.float32)
   with tf.Session(config=sess_config) as sess:
     saver.restore(sess, model_ckpt_path)
     sess.run([tf.local_variables_initializer()])
@@ -70,9 +72,10 @@ def evaluation_loop(self, saver, model_ckpt_path):
         example_per_second = res["dense_labels"].shape[0] / seconds_per_batch
         examples_processed += res["dense_labels"].shape[0]
         predictions = res["predictions"]
-        video_id = res["video_id"].tolist()
-        pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
-        video_ids += video_id
+        if output_scores:
+          video_id = res["video_id"].tolist()
+          pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
+          video_ids += video_id
 
         if type(predictions) == list:
           predictions = eval_util.transform_preds(self, predictions)
@@ -107,8 +110,9 @@ def evaluation_loop(self, saver, model_ckpt_path):
       # calculate the metrics for the entire epoch
       epoch_info_dict = evl_metrics.get()
       epoch_info_dict["epoch_id"] = global_step_val
-      pred_out.close()
-      pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
+      if output_scores:
+        pred_out.close()
+        pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
 
       if summary_writer:
         summary_writer.add_summary(res["summary"], global_step_val)
