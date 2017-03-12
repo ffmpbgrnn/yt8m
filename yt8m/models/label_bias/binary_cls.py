@@ -32,20 +32,20 @@ class BinaryLogisticModel(models.BaseModel):
     model_input_4d = tf.reshape(model_input, [-1, 256, 1, 256])
     gate_activations = slim.conv2d(
         model_input_4d,
-        1, activation_fn=None, biases_initializer=None,
+        1, [1, 1], activation_fn=None, biases_initializer=None,
         weights_regularizer=slim.l2_regularizer(1e-8),
         scope="gates")
     gating_distribution = tf.nn.softmax(gate_activations, dim=1)
 
     expert_activations = slim.conv2d(
         model_input_4d,
-        1, activation_fn=None, biases_initializer=None,
+        1, [1, 1], activation_fn=None, biases_initializer=None,
         weights_regularizer=slim.l2_regularizer(1e-8),
         scope="experts")
     expert_distribution = tf.nn.sigmoid(expert_activations)
-    predictions = tf.reduce_sum(gating_distribution * expert_distribution, axis=1)
+    predictions = tf.reduce_sum(gating_distribution * expert_distribution, axis=[1, 2])
 
-    epsilon = 10e-12
+    epsilon = 1e-12
     labels = tf.cast(dense_labels, tf.float32)
     cross_entropy_loss = labels * tf.log(predictions + epsilon) + (
         1 - labels) * tf.log(1 - predictions + epsilon)

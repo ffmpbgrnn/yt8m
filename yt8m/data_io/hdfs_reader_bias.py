@@ -52,8 +52,9 @@ class Feed_fn_setup(object):
     elif feat_type == "vlad":
       self.vid_dict, self.mean_data = self.load_vlad_info(stage)
 
+    # TODO
     target_label = 0
-    target_label = 4712
+    # target_label = 4712
     self.pos_vids, self.neg_vids = [], []
     for vid, labels in self.vid_to_labels.iteritems():
       labels = [int(l) for l in labels]
@@ -72,8 +73,8 @@ class Feed_fn_setup(object):
     self.batch_id_queue = Queue.Queue(1500)
     if self.phase_train:
       # TODO
-      bi_threads = threading.Thread(target=self.input_vid_threads_train_keep_ratio)
-      # bi_threads = threading.Thread(target=self.input_vid_threads_train)
+      # bi_threads = threading.Thread(target=self.input_vid_threads_train_keep_ratio)
+      bi_threads = threading.Thread(target=self.input_vid_threads_train)
     else:
       bi_threads = threading.Thread(target=self.input_vid_threads_val)
     bi_threads.start()
@@ -179,8 +180,8 @@ class Feed_fn(object):
     vid_index_sortidx = np.argsort(vid_index)
     try:
       # TODO
-      # batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
-      batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :1024]
+      batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
+      # batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :1024]
     except:
       print(vid_index[vid_index_sortidx])
       print(vids)
