@@ -20,17 +20,42 @@ class BinaryLogisticModel(models.BaseModel):
     self.base_learning_rate = 1e-2
     self.num_classes = 1
     # TODO
-    self.normalize_input = True
+    self.normalize_input = False
     self.use_vlad = True
+
+
+  def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
+                   is_training=True, dense_labels=None, **unused_params):
+    num_centers = []
+    model_input = tf.reshape(model_input, [-1, 256, 256])
+    model_input = self.normalize(model_input)
+    model_input_4d = tf.reshape(model_input, [-1, 256, 1, 256])
+    gate_activations = slim.conv2d(
+        model_input_4d,
+        1, activation_fn=None, biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(1e-8),
+        scope="gates")
+    gating_distribution = tf.nn.softmax(gate_activations, dim=1)
+
+    expert_activations = slim.conv2d(
+        model_input_4d,
+        1, activation_fn=None, biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(1e-8),
+        scope="experts")
+    expert_distribution = tf.nn.sigmoid(expert_activations)
+    predictions = tf.reduce_sum(gating_distribution * expert_distribution, axis=1)
+
+    epsilon = 10e-12
+    labels = tf.cast(dense_labels, tf.float32)
+    cross_entropy_loss = labels * tf.log(predictions + epsilon) + (
+        1 - labels) * tf.log(1 - predictions + epsilon)
+    cross_entropy_loss = tf.negative(cross_entropy_loss)
+    loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
+
+    return {"predictions": predictions, "loss": loss}
 
   def create_model_matrix(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
-    if self.use_vlad:
-      model_input = tf.sign(model_input) * tf.sqrt(tf.abs(model_input))
-      model_input = tf.reshape(model_input, [-1, 256, 256])
-      model_input = tf.nn.l2_normalize(model_input, 2)
-      model_input = tf.reshape(model_input, [-1, 256, 1, 256])
-
     att_hidden_size = 100
     hidden = slim.conv2d(model_input, att_hidden_size, [1, 1], activation_fn=None, scope="hidden_conv2d")
     v = tf.get_variable("attn_v", [1, 1, 1, att_hidden_size],
@@ -64,7 +89,7 @@ class BinaryLogisticModel(models.BaseModel):
     preds = tf.nn.sigmoid(logits)
     return {"predictions": preds, "loss": loss}
 
-  def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
+  def create_model_video(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
     l2_penalty = 1e-8
     logits = slim.fully_connected(
@@ -90,13 +115,6 @@ class BinaryLogisticModel(models.BaseModel):
         weights_regularizer=slim.l2_regularizer(l2_penalty))
     '''
 
-    if self.use_vlad:
-      model_input = tf.sign(model_input) * tf.sqrt(tf.abs(model_input))
-      model_input = tf.reshape(model_input, [-1, 256, 256])
-      model_input = tf.nn.l2_normalize(model_input, 2)
-      model_input = tf.reshape(model_input, [-1, 256*256])
-      model_input = tf.nn.l2_normalize(model_input, 1)
-
     # if is_training:
       # model_input = tf.nn.dropout(model_input, 0.2)
     l2_penalty = 1e-8
@@ -105,8 +123,17 @@ class BinaryLogisticModel(models.BaseModel):
         weights_regularizer=slim.l2_regularizer(l2_penalty))
     labels = tf.cast(dense_labels, tf.float32)
     # TODO
-    labels = tf.abs(labels - 0.1)
+    # labels = tf.abs(labels - 0.1)
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
     loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
     preds = tf.nn.sigmoid(logits)
     return {"predictions": preds, "loss": loss}
+
+  def normalize(self, model_input):
+    if self.use_vlad:
+      model_input = tf.sign(model_input) * tf.sqrt(tf.abs(model_input))
+      model_input = tf.reshape(model_input, [-1, 256, 256])
+      model_input = tf.nn.l2_normalize(model_input, 2)
+      # model_input = tf.reshape(model_input, [-1, 256*256])
+      # model_input = tf.nn.l2_normalize(model_input, 1)
+    return model_input

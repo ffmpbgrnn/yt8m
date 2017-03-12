@@ -53,6 +53,7 @@ class Feed_fn_setup(object):
       self.vid_dict, self.mean_data = self.load_vlad_info(stage)
 
     target_label = 0
+    target_label = 4712
     self.pos_vids, self.neg_vids = [], []
     for vid, labels in self.vid_to_labels.iteritems():
       labels = [int(l) for l in labels]
@@ -62,19 +63,22 @@ class Feed_fn_setup(object):
         self.neg_vids.append(vid)
     random.shuffle(self.pos_vids)
     random.shuffle(self.neg_vids)
+    print("num pos: {}; num neg: {}".format(len(self.pos_vids), len(self.neg_vids)))
 
     self.num_classes = num_classes
+    # TODO
     self.batch_size = 32
 
     self.batch_id_queue = Queue.Queue(1500)
     if self.phase_train:
-      bi_threads = threading.Thread(target=self.input_vid_threads_train)
+      # TODO
+      bi_threads = threading.Thread(target=self.input_vid_threads_train_keep_ratio)
+      # bi_threads = threading.Thread(target=self.input_vid_threads_train)
     else:
       bi_threads = threading.Thread(target=self.input_vid_threads_val)
     bi_threads.start()
 
   def input_vid_threads_val(self):
-    print("num pos: {}; num neg: {}".format(len(self.pos_vids), len(self.neg_vids)))
     for i in xrange(0, len(self.pos_vids), self.batch_size):
       batch_vids = self.pos_vids[i: i + self.batch_size]
       if len(batch_vids) == 0:
@@ -112,6 +116,8 @@ class Feed_fn_setup(object):
     ratio = 1. * num_pos / num_neg
     num_pos_batch = int(math.ceil((self.batch_size * ratio)))
     sentinal = []
+    # TODO
+    num_pos_batch = 90
     for i in xrange(self.batch_size):
       if i < num_pos_batch:
         sentinal.append(1)
@@ -119,13 +125,14 @@ class Feed_fn_setup(object):
         sentinal.append(0)
 
     random.shuffle(sentinal)
+    shuffle_pos, shuffle_neg = False, False
     while True:
       if sentinal[len(batch_vids)] == 1:
         dense_labels[len(batch_vids), 0] = 1
         batch_vids.append(self.pos_vids[pos_vid_ptr])
         if len(self.pos_vids) == pos_vid_ptr + 1:
           pos_vid_ptr = 0
-          random.shuffle(self.pos_vids)
+          shuffle_pos = True
         else:
           pos_vid_ptr += 1
       else:
@@ -133,7 +140,7 @@ class Feed_fn_setup(object):
         batch_vids.append(self.neg_vids[neg_vid_ptr])
         if len(self.neg_vids) == neg_vid_ptr + 1:
           neg_vid_ptr = 0
-          random.shuffle(self.neg_vids)
+          shuffle_neg = True
         else:
           neg_vid_ptr += 1
 
@@ -142,6 +149,12 @@ class Feed_fn_setup(object):
         batch_vids = []
         dense_labels = np.zeros((self.batch_size, 1), dtype=np.int64)
         random.shuffle(sentinal)
+        if shuffle_pos:
+          random.shuffle(self.pos_vids)
+          shuffle_pos = False
+        if shuffle_neg:
+          random.shuffle(self.neg_vids)
+          shuffle_neg = False
 
 
 class Feed_fn(object):
@@ -165,7 +178,9 @@ class Feed_fn(object):
     vid_index = np.array(vid_index)
     vid_index_sortidx = np.argsort(vid_index)
     try:
-      batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
+      # TODO
+      # batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :]
+      batch_data = self._i.mean_data[vid_index[vid_index_sortidx], :1024]
     except:
       print(vid_index[vid_index_sortidx])
       print(vids)

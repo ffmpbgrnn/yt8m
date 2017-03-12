@@ -137,8 +137,8 @@ class Expr(object):
     elif self.config.input_feat_type == "video":
       reader = readers.YT8MAggregatedFeatureReader(
           feature_names=self.feature_names,
-          feature_sizes=self.feature_sizes,
-          label_smoothing=self.config.label_smoothing)
+          feature_sizes=self.feature_sizes,)
+          # label_smoothing=self.config.label_smoothing)
     elif self.config.input_feat_type == "vlad":
       reader = vlad_reader.YT8MVLADFeatureReader(
           feature_names=self.feature_names,
