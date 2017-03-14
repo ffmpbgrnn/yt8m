@@ -24,7 +24,7 @@ class BinaryLogisticModel(models.BaseModel):
     self.use_vlad = True
 
 
-  def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
+  def create_model_moe(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
     num_centers = []
     model_input = tf.reshape(model_input, [-1, 256, 256])
@@ -53,6 +53,27 @@ class BinaryLogisticModel(models.BaseModel):
     loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
 
     return {"predictions": predictions, "loss": loss}
+
+  # create_model_dropout
+  def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
+                   is_training=True, dense_labels=None, **unused_params):
+    model_input = tf.reshape(model_input, [-1, 256, 256])
+    sentinal = tf.ones((1, 256, 1), dtype=tf.float32)
+    if is_training:
+      sentinal = tf.nn.dropout(sentinal, 1./8)
+    model_input = model_input * sentinal
+    model_input = tf.reshape(model_input, [-1, 256, 256])
+
+    logits = slim.fully_connected(
+        model_input, 1, activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(1e-8))
+    if not is_training:
+      logits /= 8.
+    labels = tf.cast(dense_labels, tf.float32)
+    loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+    preds = tf.nn.sigmoid(logits)
+    return {"predictions": preds, "loss": loss}
 
   def create_model_matrix(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
