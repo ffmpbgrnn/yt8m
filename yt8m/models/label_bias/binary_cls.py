@@ -57,18 +57,20 @@ class BinaryLogisticModel(models.BaseModel):
   # create_model_dropout
   def create_model(self, model_input, vocab_size, l2_penalty=1e-5,
                    is_training=True, dense_labels=None, **unused_params):
+    # model_input = self.normalize(model_input)
     model_input = tf.reshape(model_input, [-1, 256, 256])
     sentinal = tf.ones((1, 256, 1), dtype=tf.float32)
+    dropout_ratio = 2.
     if is_training:
-      sentinal = tf.nn.dropout(sentinal, 1./8)
+      sentinal = tf.nn.dropout(sentinal, 1./dropout_ratio)
     model_input = model_input * sentinal
-    model_input = tf.reshape(model_input, [-1, 256, 256])
+    model_input = tf.reshape(model_input, [-1, 256 * 256])
 
     logits = slim.fully_connected(
         model_input, 1, activation_fn=None,
         weights_regularizer=slim.l2_regularizer(1e-8))
     if not is_training:
-      logits /= 8.
+      logits /= dropout_ratio
     labels = tf.cast(dense_labels, tf.float32)
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
     loss = tf.reduce_mean(tf.reduce_sum(loss, 1))

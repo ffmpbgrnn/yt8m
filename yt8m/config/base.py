@@ -38,6 +38,7 @@ class BaseConfig(object):
         "BinaryLogisticModel",
         "Dilation",
         "NetVLAD",
+        "MoeModel",
     ]
     self.label_smoothing = False
     # self.model_name = "NetVLAD"
@@ -49,8 +50,12 @@ class BaseConfig(object):
     # self.use_hdfs = False
 
     self.model_name = "BinaryLogisticModel"
-    self.input_feat_type = "video"
+    self.input_feat_type = "vlad"
     self.use_hdfs = True
+
+    # self.model_name = "MoeModel"
+    # self.input_feat_type = "video"
+    # self.use_hdfs = False
 
     # self.model_name = "LSTMMemNet"
     # self.input_feat_type = "frame"
@@ -62,6 +67,8 @@ class BaseConfig(object):
     elif self.input_feat_type == "video":
       self.feature_names = "mean_rgb, mean_audio"
       self.feature_sizes = "1024, 128"
+      # self.feature_names = "mean_rgb"
+      # self.feature_sizes = "1024"
     elif self.input_feat_type == "vlad":
       self.feature_names = "feas"
       self.feature_sizes = "65536"
@@ -74,7 +81,8 @@ class BaseConfig(object):
       self.num_epochs = None
       if self.model_name == "LogisticModel":
         self.num_epochs = 5
-      self.batch_size = 128
+      # TODO
+      self.batch_size = 1280
     else:
       self.num_readers = 1
       self.num_epochs = 1
