@@ -12,6 +12,7 @@ from yt8m.models.lstm import lstm_enc_dec
 from yt8m.models.lstm import skip_thought
 from yt8m.models.lstm import lstm_memnet
 from yt8m.models.label_bias import binary_cls
+from yt8m.models.noisy_label import noisy_label
 from yt8m.models.dilated import dilation
 from yt8m.models.netvlad import netvlad
 from yt8m.data_io import readers
@@ -50,7 +51,7 @@ class Expr(object):
 
     self.model = utils.find_class_by_name(self.config.model_name,
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
-         lstm_memnet, conv_train, binary_cls, dilation, netvlad])()
+         lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
