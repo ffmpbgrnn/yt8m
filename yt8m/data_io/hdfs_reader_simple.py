@@ -21,10 +21,7 @@ class Feed_fn_setup(object):
       vid_list = pkl.load(fin)
       for i, vid in enumerate(vid_list):
         vid_dict[vid] = i
-    if mem_map:
-      mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/{}/mean.h5".format(stage), 'r', driver='core')['feas']
-    else:
-      mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/{}/mean.h5".format(stage), 'r')['feas']
+      mean_data = h5py.File("/data/state/linchao/YT/video_hdfs/{}/mean.h5".format(stage), 'r')['feas'] # TODO
     return vid_dict, mean_data
 
   def __init__(self, num_classes, phase_train, num_threads):
