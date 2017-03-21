@@ -57,6 +57,62 @@ def resize_axis(tensor, axis, new_size, fill_value=0):
   resized.set_shape(new_shape)
   return resized
 
+def sort_and_pad(x):
+  # TODO
+  x = np.sort(x)[::-1]
+  x = x.tolist()
+  w = np.ones((self.num_max_labels), dtype=np.int64)
+  w[-1] = 0
+  caps_len = self.num_max_labels - 2
+  if len(x) > caps_len:
+    s = np.random.randint(len(x) - caps_len + 1)
+    x = [self.sos_id] + x[s: s+caps_len] + [self.eos_id]
+  else:
+    x = [self.sos_id] + x + [self.eos_id]
+    num_pad = self.num_max_labels - len(x)
+    x = x + [self.pad_id] * num_pad
+    w[-1 * num_pad - 1:] = 0
+
+    # pad = np.zeros((self.num_max_labels,), dtype=np.int64)
+    # pad[: len(x)] = x
+    # w[x.shape[0]:] = 0
+    # x = pad
+  return (x, w)
+
+def random_pick_one(x):
+  x = x.tolist()
+  # TODO
+  if np.random.randint(5) == 0:
+    exclude_x = list(self.classes - set(x))
+    x = [exclude_x[np.random.randint(len(exclude_x))],]
+    w = [self.num_classes + x[0]]
+    # w = [1,]
+  else:
+    idx = np.random.randint(len(x))
+    x = [x[idx],]
+    w = x
+    # w = [1,]
+  return (x, w)
+
+def gen_sparse_label(x):
+  return_x = np.zeros((4716), dtype=np.int64) + 4716
+  return_w = np.zeros((4716), dtype=np.float32) + 1/4716.
+  x = x.tolist()
+  for i in x:
+    return_x[i] = i
+    return_w[i] = 1.
+  return (return_x, return_w)
+
+def gen_sparse_label_batch(x):
+  return_x = np.zeros((x.shape[0], 4716), dtype=np.int64) + 4716
+  return_w = np.zeros((x.shape[0], 4716), dtype=np.float32) + 3/4716.
+  indicator = np.where(x == 1)
+  r, c = indicator[0], indicator[1]
+  for i in xrange(r.shape[0]):
+    return_x[r[i], c[i]] = c[i]
+    return_w[r[i], c[i]] = 1.
+  return (return_x, return_w)
+
 class BaseReader(object):
   """Inherit from this class when implementing new readers."""
 
@@ -76,7 +132,8 @@ class YT8MAggregatedFeatureReader(BaseReader):
   def __init__(self,
                num_classes=4716,
                feature_sizes=[1024],
-               feature_names=["mean_inc3"]):
+               feature_names=["mean_inc3"],
+               num_max_labels=-1):
     """Construct a YT8MAggregatedFeatureReader.
 
     Args:
@@ -92,6 +149,7 @@ class YT8MAggregatedFeatureReader(BaseReader):
     self.num_classes = num_classes
     self.feature_sizes = feature_sizes
     self.feature_names = feature_names
+    self.num_max_labels = num_max_labels
 
   def prepare_reader(self, filename_queue, batch_size=1024):
     """Creates a single reader thread for pre-aggregated YouTube 8M Examples.
@@ -125,6 +183,13 @@ class YT8MAggregatedFeatureReader(BaseReader):
     concatenated_features = tf.concat([
         features[feature_name] for feature_name in self.feature_names], 1)
     sparse_labels, label_weights, input_weights = labels, labels, labels
+
+    # sparse_labels = features["labels"].values
+    if self.num_max_labels == 4716:
+      sparse_labels, label_weights = tf.py_func(gen_sparse_label_batch, [labels], [tf.int64, tf.float32])
+      sparse_labels = tf.reshape(sparse_labels, [-1, self.num_max_labels])
+      label_weights = tf.reshape(label_weights, [-1, self.num_max_labels])
+
     return features["video_id"], concatenated_features, labels, sparse_labels, tf.ones([tf.shape(serialized_examples)[0]]), label_weights, input_weights
 
 class YT8MFrameFeatureReader(BaseReader):
@@ -222,43 +287,6 @@ class YT8MFrameFeatureReader(BaseReader):
             for feature_name in self.feature_names
         })
 
-    def sort_and_pad(x):
-      # TODO
-      x = np.sort(x)[::-1]
-      x = x.tolist()
-      w = np.ones((self.num_max_labels), dtype=np.int64)
-      w[-1] = 0
-      caps_len = self.num_max_labels - 2
-      if len(x) > caps_len:
-        s = np.random.randint(len(x) - caps_len + 1)
-        x = [self.sos_id] + x[s: s+caps_len] + [self.eos_id]
-      else:
-        x = [self.sos_id] + x + [self.eos_id]
-        num_pad = self.num_max_labels - len(x)
-        x = x + [self.pad_id] * num_pad
-        w[-1 * num_pad - 1:] = 0
-
-        # pad = np.zeros((self.num_max_labels,), dtype=np.int64)
-        # pad[: len(x)] = x
-        # w[x.shape[0]:] = 0
-        # x = pad
-      return (x, w)
-
-    def random_pick_one(x):
-      x = x.tolist()
-      # TODO
-      if np.random.randint(5) == 0:
-        exclude_x = list(self.classes - set(x))
-        x = [exclude_x[np.random.randint(len(exclude_x))],]
-        w = [self.num_classes + x[0]]
-        # w = [1,]
-      else:
-        idx = np.random.randint(len(x))
-        x = [x[idx],]
-        w = x
-        # w = [1,]
-      return (x, w)
-
     # read ground truth labels
     sparse_labels = contexts["labels"].values
     dense_labels = (tf.cast(
@@ -270,9 +298,14 @@ class YT8MFrameFeatureReader(BaseReader):
       sparse_labels = tf.reshape(sparse_labels, [1,])
       label_weights = tf.reshape(label_weights, [1,])
     elif self.num_max_labels > 0:
-      sparse_labels, label_weights = tf.py_func(sort_and_pad, [sparse_labels], [tf.int64, tf.int64])
-      sparse_labels = tf.reshape(sparse_labels, [self.num_max_labels])
-      label_weights = tf.reshape(label_weights, [self.num_max_labels])
+      if self.num_max_labels == 4716:
+        sparse_labels, label_weights = tf.py_func(gen_sparse_label, [sparse_labels], [tf.int64, tf.float32])
+        sparse_labels = tf.reshape(sparse_labels, [self.num_max_labels])
+        label_weights = tf.reshape(label_weights, [self.num_max_labels])
+      else:
+        sparse_labels, label_weights = tf.py_func(sort_and_pad, [sparse_labels], [tf.int64, tf.int64])
+        sparse_labels = tf.reshape(sparse_labels, [self.num_max_labels])
+        label_weights = tf.reshape(label_weights, [self.num_max_labels])
     else:
       sparse_labels = dense_labels
       label_weights = tf.constant(1, dtype=tf.int64)

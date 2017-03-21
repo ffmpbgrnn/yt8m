@@ -138,6 +138,7 @@ class Expr(object):
     elif self.config.input_feat_type == "video":
       reader = readers.YT8MAggregatedFeatureReader(
           feature_names=self.feature_names,
+          num_max_labels=self.model.num_max_labels,
           feature_sizes=self.feature_sizes,)
           # label_smoothing=self.config.label_smoothing)
     elif self.config.input_feat_type == "vlad":
