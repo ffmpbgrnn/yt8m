@@ -125,3 +125,42 @@ class MoeModel(models.BaseModel):
     final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
                                      [-1, vocab_size])
     return {"predictions": final_probabilities}
+
+
+class MoeModel_V2(models.BaseModel):
+  def __init__(self):
+    pass
+
+  def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_mixtures=None,
+                   l2_penalty=1e-8,
+                   **unused_params):
+    num_mixtures = 4
+
+    gate_activations = slim.fully_connected(
+        model_input,
+        vocab_size * (num_mixtures + 1),
+        activation_fn=None,
+        biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="gates")
+    expert_activations = slim.fully_connected(
+        model_input,
+        (vocab_size + 1) * num_mixtures,
+        activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="experts")
+
+    gating_distribution = tf.nn.softmax(tf.reshape(
+        gate_activations,
+        [-1, vocab_size, num_mixtures + 1]), dim=2)
+    expert_distribution = tf.nn.softmax(tf.reshape(
+        expert_activations,
+        [-1, vocab_size + 1, num_mixtures]), dim=1)
+
+    final_probabilities = tf.reduce_sum(
+        gating_distribution[:, :, :num_mixtures] * expert_distribution[:, :vocab_size, :],
+        axis=1)
+    return {"predictions": final_probabilities}
