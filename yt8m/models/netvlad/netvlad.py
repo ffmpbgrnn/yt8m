@@ -19,7 +19,10 @@ class NetVLAD(models.BaseModel):
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 3e-4
+    # self.optimizer_name = "RMSPropOptimizer"
+    self.base_learning_rate = 1e-2
+    # self.base_learning_rate = 4e-3
+    # self.base_learning_rate = 3e-4
     self.max_steps = 300
 
 
@@ -29,6 +32,7 @@ class NetVLAD(models.BaseModel):
     vlad_att_hidden_size = 100
     C = 20
     loss_with_vlad_kmeans = True
+    self.vocab_size = vocab_size
 
     input_size = 1024+128#tf.shape(model_input)[-1]
     fea_size = 256
@@ -97,17 +101,49 @@ class NetVLAD(models.BaseModel):
     '''
     outputs = self.normalization(residual, C * fea_size, ssr=True,
                                  intra_norm=True, l2_norm=True, norm_dim=2)
-    logits = slim.fully_connected(
-        outputs, vocab_size, activation_fn=None,
-        weights_regularizer=slim.l2_regularizer(1e-8))
+    # self.variables_to_restore = slim.get_model_variables()
+    # outputs = tf.stop_gradient(outputs)
+    batch_norm_params = {
+        'decay': 0.9997,
+        'epsilon': 0.001,
+        'updates_collections': tf.GraphKeys.UPDATE_OPS,
+    }
+    # outputs = slim.fully_connected(outputs, 1024, activation_fn=None,
+                                   # weights_regularizer=slim.l2_regularizer(1e-8),
+                                   # normalizer_fn=slim.batch_norm,
+                                   # normalizer_params=batch_norm_params,
+                                   # scope="cls_proj")
+    logits = self.get_final_probs(outputs)
+    # outputs = self.normalization(residual, C * fea_size, ssr=True,
+                                 # intra_norm=True, l2_norm=True, norm_dim=2)
+    # logits = slim.fully_connected(
+        # outputs, self.vocab_size, activation_fn=None,
+        # weights_regularizer=slim.l2_regularizer(1e-8))
 
     labels = tf.cast(dense_labels, tf.float32)
-    loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
-    loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+    # loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    with tf.name_scope("loss_xent"):
+      epsilon = 1e-12
+      cross_entropy_loss = labels * tf.log(logits + epsilon) + (
+          1 - labels) * tf.log(1 - logits + epsilon)
+      cross_entropy_loss = tf.negative(cross_entropy_loss)
+      loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
+
+    # TODO
+    loss += l2_loss * 1e-8
+
     return {
-        "predictions": tf.nn.sigmoid(logits),
-        "loss": loss + l2_loss * 1e-8,
+        "predictions": logits, # tf.nn.sigmoid(logits), # TODO
+        "loss": loss,
     }
+
+  def get_train_init_fn(self):
+    return None
+    print('restoring from...')
+    return slim.assign_from_checkpoint_fn(
+        "/data/D2DCRC/linchao/YT/log/212/model.ckpt-1625896",
+        tf.all_variables(),
+        ignore_missing_vars=True)
 
   def normalization(self, outputs, output_size, ssr=True, intra_norm=True, l2_norm=True, norm_dim=2):
     if ssr:
@@ -119,3 +155,72 @@ class NetVLAD(models.BaseModel):
     if l2_norm:
       outputs = tf.nn.l2_normalize(outputs, [1])
     return outputs
+
+  def get_final_probs0(self, predictions):
+    num_mixtures = 5
+    l2_penalty = 1e-8
+    gates = slim.fully_connected(
+        predictions,
+        num_mixtures * (self.vocab_size + 1),
+        activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="gates")
+    gate_weights = slim.fully_connected(
+        predictions,
+        num_mixtures,
+        activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="gate_weights")
+    gate_activations = tf.nn.softmax(
+        tf.reshape(gates, [-1, num_mixtures, (self.vocab_size + 1)]), dim=2)
+    # preds = gate_activations * tf.reshape(gate_weights, [-1, num_mixtures, 1])
+    preds = gate_activations
+    preds = tf.reduce_max(preds, axis=1)[:, :self.vocab_size]
+    '''
+    preds = slim.fully_connected(
+        preds,
+        self.vocab_size,
+        activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="preds")
+    '''
+    return preds
+
+  def get_final_probs(self, predictions):
+    num_mixtures = 4
+    l2_penalty = 1e-8
+    # predictions = slim.fully_connected(
+        # predictions,
+        # 1024,
+        # activation_fn=tf.nn.relu,
+        # biases_initializer=None,
+        # weights_regularizer=slim.l2_regularizer(l2_penalty),
+        # scope="input_maping")
+
+    gate_activations = slim.fully_connected(
+        predictions,
+        self.vocab_size * (num_mixtures + 1),
+        activation_fn=None,
+        biases_initializer=tf.constant_initializer(1.),
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="gates")
+    expert_activations = slim.fully_connected(
+        predictions,
+        self.vocab_size * num_mixtures,
+        activation_fn=None,
+        biases_initializer=tf.constant_initializer(1.),
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="experts")
+
+    gating_distribution = tf.nn.softmax(tf.reshape(
+        gate_activations,
+        [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
+    expert_distribution = tf.nn.sigmoid(tf.reshape(
+        expert_activations,
+        [-1, num_mixtures]))  # (Batch * #Labels) x num_mixtures
+
+    final_probabilities_by_class_and_batch = tf.reduce_sum(
+        gating_distribution[:, :num_mixtures] * expert_distribution, 1)
+    final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
+                                     [-1, self.vocab_size])
+    return final_probabilities
