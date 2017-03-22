@@ -13,12 +13,14 @@ from yt8m.models.lstm import skip_thought
 from yt8m.models.lstm import lstm_memnet
 from yt8m.models.label_bias import binary_cls
 from yt8m.models.noisy_label import noisy_label
+from yt8m.models.vlad import prune_cls
 from yt8m.models.dilated import dilation
 from yt8m.models.netvlad import netvlad
 from yt8m.data_io import readers
 from yt8m.data_io import vlad_reader
 from yt8m.data_io import hdfs_reader
 from yt8m.data_io import hdfs_reader_bias
+from yt8m.data_io import hdfs_reader_no_bias
 import utils
 from .config import base as base_config
 import models.conv.train as conv_train
@@ -51,7 +53,7 @@ class Expr(object):
 
     self.model = utils.find_class_by_name(self.config.model_name,
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
-         lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label])()
+         lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
@@ -61,7 +63,7 @@ class Expr(object):
     self.feature_names, self.feature_sizes = utils.GetListOfFeatureNamesAndSizes(
         self.config.feature_names, self.config.feature_sizes)
     if self.config.use_hdfs:
-      inputs = hdfs_reader_bias.enqueue_data(
+      inputs = hdfs_reader_no_bias.enqueue_data(
           self.config.input_feat_type, self.phase_train, self.batch_size,
           self.model.num_classes, sum(self.feature_sizes))
       video_id_batch, dense_labels_batch, model_input_raw = inputs

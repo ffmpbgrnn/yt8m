@@ -72,7 +72,7 @@ class Feed_fn_setup(object):
       dense_labels = np.ones((len(batch_vids), self.num_classes), dtype=np.int64)
       for vid_idx, vid in enumerate(batch_vids):
         for l in self.vid_to_labels[vid]:
-          dense_labels[vid_idx, l] = 1
+          dense_labels[vid_idx, int(l)] = 1
       self.batch_id_queue.put((batch_vids, np.array(dense_labels)))
     for i in xrange(self.num_threads):
       self.batch_id_queue.put(False)
@@ -85,7 +85,7 @@ class Feed_fn_setup(object):
     while True:
       vid = self.vids[vid_ptr]
       for l in self.vid_to_labels[vid]:
-        dense_labels[len(batch_vids), l] = 1
+        dense_labels[len(batch_vids), int(l)] = 1
       batch_vids.append(vid)
       if len(self.vids) == vid_ptr + 1:
         vid_ptr = 0
