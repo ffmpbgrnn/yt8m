@@ -128,9 +128,6 @@ class MoeModel(models.BaseModel):
 
 
 class MoeModel_V2(models.BaseModel):
-  def __init__(self):
-    pass
-
   def create_model(self,
                    model_input,
                    vocab_size,
@@ -162,5 +159,5 @@ class MoeModel_V2(models.BaseModel):
 
     final_probabilities = tf.reduce_sum(
         gating_distribution[:, :, :num_mixtures] * expert_distribution[:, :vocab_size, :],
-        axis=1)
+        axis=2)
     return {"predictions": final_probabilities}

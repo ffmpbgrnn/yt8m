@@ -35,7 +35,7 @@ class PruneCls(models.BaseModel):
     l2_penalty = 1e-8
     r, u = 256, 256
     model_input = tf.reshape(model_input, [-1, 256, 256])
-    p, q = 64, 64
+    p, q = 5, 5
     # Pruning ratio: p / 128
 
     outputs0 = []

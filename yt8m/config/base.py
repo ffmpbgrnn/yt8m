@@ -39,8 +39,24 @@ class BaseConfig(object):
         "Dilation",
         "NetVLAD",
         "MoeModel",
+        "MoeModel_V2",
+        "NoisyLabelModel",
+        "PruneCls",
     ]
     self.label_smoothing = False
+
+    # self.model_name = "NoisyLabelModel"
+    # self.input_feat_type = "video"
+    # self.use_hdfs = False
+
+    self.model_name = "PruneCls"
+    self.input_feat_type = "vlad"
+    self.use_hdfs = True
+
+    # self.model_name = "MoeModel_V2"
+    # self.input_feat_type = "video"
+    # self.use_hdfs = False
+
     # self.model_name = "NetVLAD"
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
@@ -49,9 +65,9 @@ class BaseConfig(object):
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
 
-    self.model_name = "BinaryLogisticModel"
-    self.input_feat_type = "vlad"
-    self.use_hdfs = True
+    # self.model_name = "BinaryLogisticModel"
+    # self.input_feat_type = "vlad"
+    # self.use_hdfs = True
 
     # self.model_name = "MoeModel"
     # self.input_feat_type = "video"
@@ -82,7 +98,7 @@ class BaseConfig(object):
       if self.model_name == "LogisticModel":
         self.num_epochs = 5
       # TODO
-      self.batch_size = 1280
+      self.batch_size = 128
     else:
       self.num_readers = 1
       self.num_epochs = 1
