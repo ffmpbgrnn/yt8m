@@ -32,6 +32,39 @@ class PruneCls(models.BaseModel):
     model_input = tf.reshape(model_input, [-1, 256*256])
     model_input = tf.nn.l2_normalize(model_input, 1)
 
+    l2_penalty = 1e-12
+    model_input = slim.fully_connected(
+        model_input, 1280, activation_fn=tf.nn.relu,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="proj_a")
+    # if is_training:
+      # model_input = tf.nn.dropout(model_input, 0.5)
+    model_input = slim.fully_connected(
+        model_input, 1280, activation_fn=tf.nn.relu,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="proj_b")
+    # if is_training:
+      # model_input = tf.nn.dropout(model_input, 0.5)
+    logits = slim.fully_connected(
+        model_input, vocab_size, activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="proj_c")
+
+    labels = tf.cast(dense_labels, tf.float32)
+    loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+    preds = tf.nn.sigmoid(logits)
+    return {"predictions": preds, "loss": loss}
+
+  def create_model_prune_cls(self, model_input, vocab_size, num_frames,
+                   is_training=True, sparse_labels=None, label_weights=None,
+                   dense_labels=None, input_weights=None, **unused_params):
+    model_input = tf.sign(model_input) * tf.sqrt(tf.abs(model_input))
+    model_input = tf.reshape(model_input, [-1, 256, 256])
+    model_input = tf.nn.l2_normalize(model_input, 2)
+    model_input = tf.reshape(model_input, [-1, 256*256])
+    model_input = tf.nn.l2_normalize(model_input, 1)
+
     l2_penalty = 1e-8
     r, u = 256, 256
     model_input = tf.reshape(model_input, [-1, 256, 256])
