@@ -31,7 +31,6 @@ def restore(saver, sess, train_dir):
 
 def evaluation_loop(self, saver, model_ckpt_path):
   global_step_val = model_ckpt_path.split("/")[-1].split("-")[-1]
-  model_id = model_ckpt_path.split("/")[-2]
   evl_metrics = eval_util.EvaluationMetrics(self.model.num_classes, self.config.top_k)
 
   # summary_writer = tf.summary.FileWriter(
@@ -43,9 +42,16 @@ def evaluation_loop(self, saver, model_ckpt_path):
   video_ids = []
   output_scores = False
   if output_scores:
-    video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.val.pkl".format(model_id)
-    pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.val.h5".format(model_id), "w")
-    pred_dataset = pred_out.create_dataset('scores', shape=(1401828, 4716),
+    model_id = model_ckpt_path.split("/")[-2]
+    # num_insts = 4906660
+    # stage = "train"
+    # num_insts = 1401828
+    # stage = "validate"
+    num_insts = 700640
+    stage = "test"
+    video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
+    pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.{}.h5".format(model_id, stage), "w")
+    pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, 4716),
                                             dtype=np.float32)
   with tf.Session(config=sess_config) as sess:
     saver.restore(sess, model_ckpt_path)

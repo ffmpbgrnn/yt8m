@@ -133,5 +133,6 @@ class BaseConfig(object):
       self.phase_train = False
       data_pattern_str = "validate" if self.stage == "eval" else "test"
 
+    # data_pattern_str = "train"
     self.data_pattern = "/data/state/linchao/YT/{0}/{1}/{1}*.tfrecord".format(
         self.input_feat_type, data_pattern_str)
