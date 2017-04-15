@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from tensorflow import gfile
 
 def _int64_feature(values):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
@@ -45,7 +46,8 @@ def write():
 
 def read():
   feature_names = ["rgb", "audio"]
-  filename_queue = tf.train.string_input_producer(["../../trainzy.tfrecord"],
+  files = gfile.Glob("")
+  filename_queue = tf.train.string_input_producer(files,
                                                   shuffle=False, num_epochs=1)
   reader = tf.TFRecordReader()
   _, serialized_example = reader.read(filename_queue)
@@ -79,7 +81,8 @@ def read():
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     # feas_val, labels, video_id = sess.run([feas, contexts["labels"], contexts["video_id"]])
-    output_filename = "a.tfrecord"
+    cnt = 0
+    output_filename = "{}.tfrecord".format(cnt / 1200)
     tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
     try:
       while True:
@@ -90,6 +93,11 @@ def read():
         example = matrix_to_tfexample(
             rgb_v, audio_v, labels=sparse_labels_v, video_id=video_id_v)
         tfrecord_writer.write(example.SerializeToString())
+        if cnt % 1200 == 0:
+          tfrecord_writer.close()
+          output_filename = "{}.tfrecord".format(cnt / 1200)
+          tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
+        cnt += 1
         # print(video_id_v, sparse_labels_v)
         # print(rgb_v)
         # print(rgb_v.shape)
@@ -145,5 +153,5 @@ def just_read():
 
 # write()
 print("------------------------")
-# read()
-just_read()
+read()
+# just_read()
