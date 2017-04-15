@@ -23,6 +23,31 @@ class NetVLAD(models.BaseModel):
     self.max_steps = 300
 
 
+  def context_encoder(self, inputs, fea_size):
+    def get_cell():
+      cell_size = 1024
+      cell = core_rnn_cell.GRUCell(cell_size)
+      cell = core_rnn_cell.OutputProjectionWrapper(cell, fea_size)
+      return cell
+
+    runtime_batch_size = tf.shape(inputs)[0]
+    enc_cell = get_cell()
+    init_state = enc_cell.zero_state(runtime_batch_size, dtype=tf.float32)
+    enc_outputs, enc_state = tf.nn.dynamic_rnn(
+        enc_cell, inputs, initial_state=init_state, scope="enc")
+
+    input_lists = tf.split(inputs, num_or_size_splits=300, axis=1)
+    target_lists = []
+    for i in xrange(300-1):
+      target_lists.append(
+          tf.stop_gradient(input_lists[i+1]))
+    target_lists.append(input_lists[0])
+    targets = tf.stack(target_lists, axis=1)
+
+    loss = tf.reduce_sum(tf.abs(enc_outputs - targets)) / tf.cast(runtime_batch_size, dtype=tf.float32)
+    outputs = tf.stop_gradient(enc_outputs) + inputs
+    return outputs
+
   def create_model(self, model_input, vocab_size, num_frames,
                    is_training=True, sparse_labels=None, label_weights=None,
                    dense_labels=None, input_weights=None, **unused_params):
@@ -33,6 +58,8 @@ class NetVLAD(models.BaseModel):
 
     input_size = 1024+128#tf.shape(model_input)[-1]
     fea_size = 256
+
+
     model_input = tf.reshape(model_input, [-1, self.max_steps, 1, input_size])
     model_input = slim.conv2d(model_input, fea_size, [1, 1], activation_fn=None, scope="input_proj")
     model_input = tf.reshape(model_input, [-1, self.max_steps, fea_size])
@@ -41,11 +68,12 @@ class NetVLAD(models.BaseModel):
         [1, 1, fea_size])
     inputs = model_input * input_weights
 
+    inputs = self.context_encoder(inputs, fea_size)
 
     with tf.variable_scope("centers"):
       center = tf.get_variable("center", shape=[1, C, 1, fea_size], dtype=tf.float32,
                                initializer=tf.truncated_normal_initializer(stddev=0.01),
-                               regularizer=slim.l2_regularizer(1e-5))
+                               regularizer=slim.l2_regularizer(1e-8))
     hidden = slim.conv2d(center, vlad_att_hidden_size, [1, 1], activation_fn=None, scope="hidden_conv2d")
 
     v = tf.get_variable("attn_v", [1, 1, 1, vlad_att_hidden_size],
