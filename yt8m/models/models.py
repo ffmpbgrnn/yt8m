@@ -31,3 +31,6 @@ class BaseModel(object):
 
   def get_train_init_fn(self):
     return None
+
+  def get_variables_with_ckpt(self):
+    return tf.all_variables()

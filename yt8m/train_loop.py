@@ -52,7 +52,8 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
   saver = tf.train.Saver(max_to_keep=1000000)
 
   if len(model_ckpt_path) > 0:
-    variables_to_restore = tf.all_variables()
+    logging.info("restore from {}".format(model_ckpt_path))
+    variables_to_restore = self.model.get_variables_with_ckpt()
     init_fn = slim.assign_from_checkpoint_fn(
         model_ckpt_path,
         variables_to_restore,

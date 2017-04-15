@@ -19,10 +19,7 @@ class NetVLAD(models.BaseModel):
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
-    # self.optimizer_name = "RMSPropOptimizer"
-    self.base_learning_rate = 1e-2
-    # self.base_learning_rate = 4e-3
-    # self.base_learning_rate = 3e-4
+    self.base_learning_rate = 1e-2 # 4e-3, 3e-4
     self.max_steps = 300
 
 
@@ -101,39 +98,32 @@ class NetVLAD(models.BaseModel):
     '''
     outputs = self.normalization(residual, C * fea_size, ssr=True,
                                  intra_norm=True, l2_norm=True, norm_dim=2)
-    # self.variables_to_restore = slim.get_model_variables()
-    # outputs = tf.stop_gradient(outputs)
-    batch_norm_params = {
-        'decay': 0.9997,
-        'epsilon': 0.001,
-        'updates_collections': tf.GraphKeys.UPDATE_OPS,
-    }
-    # outputs = slim.fully_connected(outputs, 1024, activation_fn=None,
-                                   # weights_regularizer=slim.l2_regularizer(1e-8),
-                                   # normalizer_fn=slim.batch_norm,
-                                   # normalizer_params=batch_norm_params,
-                                   # scope="cls_proj")
-    logits = self.get_final_probs(outputs)
-    # outputs = self.normalization(residual, C * fea_size, ssr=True,
-                                 # intra_norm=True, l2_norm=True, norm_dim=2)
-    # logits = slim.fully_connected(
-        # outputs, self.vocab_size, activation_fn=None,
-        # weights_regularizer=slim.l2_regularizer(1e-8))
+    logits = slim.fully_connected(
+        outputs, self.vocab_size, activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(1e-8))
 
     labels = tf.cast(dense_labels, tf.float32)
-    # loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
+    loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+    logits = tf.nn.sigmoid(logits)
+    # self.variables_to_restore = slim.get_model_variables()
+    # outputs = tf.stop_gradient(outputs)
+
+    '''
+    logits = self.get_final_probs(outputs)
     with tf.name_scope("loss_xent"):
       epsilon = 1e-12
       cross_entropy_loss = labels * tf.log(logits + epsilon) + (
           1 - labels) * tf.log(1 - logits + epsilon)
       cross_entropy_loss = tf.negative(cross_entropy_loss)
       loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
+    '''
 
     # TODO
     loss += l2_loss * 1e-8
 
     return {
-        "predictions": logits, # tf.nn.sigmoid(logits), # TODO
+        "predictions": logits,
         "loss": loss,
     }
 
@@ -155,6 +145,18 @@ class NetVLAD(models.BaseModel):
     if l2_norm:
       outputs = tf.nn.l2_normalize(outputs, [1])
     return outputs
+
+  def get_final_probs00(self, predictions):
+    batch_norm_params = {
+        'decay': 0.9997,
+        'epsilon': 0.001,
+        'updates_collections': tf.GraphKeys.UPDATE_OPS,
+    }
+    outputs = slim.fully_connected(outputs, 1024, activation_fn=None,
+                                   weights_regularizer=slim.l2_regularizer(1e-8),
+                                   normalizer_fn=slim.batch_norm,
+                                   normalizer_params=batch_norm_params,
+                                   scope="cls_proj")
 
   def get_final_probs0(self, predictions):
     num_mixtures = 5

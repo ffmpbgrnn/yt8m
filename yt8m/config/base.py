@@ -49,9 +49,9 @@ class BaseConfig(object):
     # self.input_feat_type = "video"
     # self.use_hdfs = False
 
-    self.model_name = "PruneCls"
-    self.input_feat_type = "vlad"
-    self.use_hdfs = True
+    # self.model_name = "PruneCls"
+    # self.input_feat_type = "vlad"
+    # self.use_hdfs = True
 
     # self.model_name = "MoeModel_V2"
     # self.input_feat_type = "video"
@@ -76,6 +76,10 @@ class BaseConfig(object):
     # self.model_name = "LSTMMemNet"
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
+
+    self.model_name = "SkipThought"
+    self.input_feat_type = "frame"
+    self.use_hdfs = False
 
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"
