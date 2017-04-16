@@ -57,9 +57,9 @@ class BaseConfig(object):
     # self.input_feat_type = "video"
     # self.use_hdfs = False
 
-    # self.model_name = "NetVLAD"
-    # self.input_feat_type = "frame"
-    # self.use_hdfs = False
+    self.model_name = "NetVLAD"
+    self.input_feat_type = "frame"
+    self.use_hdfs = False
 
     # self.model_name = "Dilation"
     # self.input_feat_type = "frame"
@@ -77,9 +77,9 @@ class BaseConfig(object):
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
 
-    self.model_name = "SkipThought"
-    self.input_feat_type = "frame"
-    self.use_hdfs = False
+    # self.model_name = "SkipThought"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
 
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"
