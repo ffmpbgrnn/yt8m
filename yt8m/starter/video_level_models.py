@@ -68,7 +68,7 @@ class LogisticModel(models.BaseModel):
     return {"predictions": preds, "loss": loss}
 
 class MoeConfig(object):
-  moe_num_mixtures = 100
+  moe_num_mixtures = 200
 
 class MoeModel(models.BaseModel):
   """A softmax over a mixture of logistic models (with L2 regularization)."""
@@ -79,7 +79,7 @@ class MoeModel(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
     self.num_max_labels = -1
-    self.num_classes = 250-25
+    self.num_classes = 25
 
   def create_model(self,
                    model_input,
@@ -109,8 +109,8 @@ class MoeModel(models.BaseModel):
     num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
 
     self.is_training = is_training
-    # if self.is_training:
-      # model_input = tf.nn.dropout(model_input, 0.5)
+    if self.is_training:
+      model_input = tf.nn.dropout(model_input, 0.8)
     gate_activations = slim.fully_connected(
         model_input,
         vocab_size * (num_mixtures + 1),
