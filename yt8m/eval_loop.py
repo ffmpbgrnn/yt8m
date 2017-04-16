@@ -51,7 +51,7 @@ def evaluation_loop(self, saver, model_ckpt_path):
     stage = "test"
     video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
     pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.{}.h5".format(model_id, stage), "w")
-    pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, 4716),
+    pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, self.model.num_classes),
                                             dtype=np.float32)
   with tf.Session(config=sess_config) as sess:
     saver.restore(sess, model_ckpt_path)
