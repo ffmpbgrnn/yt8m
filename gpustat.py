@@ -41,6 +41,12 @@ def main(hostname, mem_percent):
         0: 1,
         1: 0,
         2: 2}
+  elif hostname == "UTS4":
+    gpu_id_mapping = {
+        0: 0,
+        1: 2,
+        2: 1,
+        3: 3}
   gpu_query_columns = ('index', 'uuid', 'name', 'temperature.gpu',
                         'utilization.gpu', 'memory.used', 'memory.total')
 
