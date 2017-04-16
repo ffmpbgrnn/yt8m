@@ -38,7 +38,9 @@ def write():
     # tfrecord_writer.write(example.SerializeToString())
 
 def read():
-  files = gfile.Glob("/data/uts700/linchao/yt8m/data/video_level/video_level/train/*.tfrecord")
+  stage = "validate"
+  output_prefix = "/data/uts700/linchao/yt8m/data/video_level_25/{}".format(stage)
+  files = gfile.Glob("/data/uts700/linchao/yt8m/data/video_level/video_level/{}/*.tfrecord".format(stage))
   filename_queue = tf.train.string_input_producer(files,
                                                   shuffle=False, num_epochs=1)
   reader = tf.TFRecordReader()
@@ -63,7 +65,7 @@ def read():
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     cnt = 0
-    output_filename = "/data/uts700/linchao/yt8m/data/video_level_25/train/{}.tfrecord".format(cnt / 1200)
+    output_filename = "{}/{}.tfrecord".format(output_prefix, cnt / 1200)
     tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
     target_labels = set(range(25))
     try:
@@ -81,7 +83,7 @@ def read():
         tfrecord_writer.write(example.SerializeToString())
         if cnt % 1200 == 0:
           tfrecord_writer.close()
-          output_filename = "/data/uts700/linchao/yt8m/data/video_level_25/train/{}.tfrecord".format(cnt / 1200)
+          output_filename = "{}/{}.tfrecord".format(output_prefix, cnt / 1200)
           tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
         cnt += 1
         # print(video_id_v, sparse_labels_v)
