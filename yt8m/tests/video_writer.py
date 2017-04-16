@@ -12,77 +12,58 @@ def _float_feature(values):
     return tf.train.Feature(float_list=tf.train.FloatList(value=values))
 
 def matrix_to_tfexample(rgb, audio, labels=[], video_id=None):
-  return tf.train.SequenceExample(
-      context=tf.train.Features(feature={
+  return tf.train.Example(
+      features=tf.train.Features(feature={
           "labels": _int64_feature(labels),
           "video_id": _bytes_feature([video_id]),
+          "mean_rgb": _bytes_feature([rgb]),
+          "mean_audio": _bytes_feature([audio]),
       }),
-      feature_lists=tf.train.FeatureLists(feature_list={
-          "rgb": tf.train.FeatureList(feature=[
-              tf.train.Feature(bytes_list=tf.train.BytesList(value=[rgb]))
-              # tf.train.Feature(float_list=tf.train.FloatList(value=feat))
-                # for input_ in inputs
-          ]),
-          "audio": tf.train.FeatureList(feature=[
-              tf.train.Feature(bytes_list=tf.train.BytesList(value=[audio]))
-          ])
-      })
   )
 
 def write():
   output_filename = "/tmp/a.tfrecord"
   with tf.python_io.TFRecordWriter(output_filename) as tfrecord_writer:
-    d = np.array(np.random.rand(256, 1024), dtype=np.float32)
-    print(d)
+    rgb = np.array(np.random.rand(1024), dtype=np.float32)
+    audio = np.array(np.random.rand(128), dtype=np.float32)
+    print(rgb)
     example = matrix_to_tfexample(
-        d.tostring(), labels=[1, 2], video_id="asf")
+        rgb.tostring(), audio.tostring(), labels=[1, 2], video_id="asf")
     tfrecord_writer.write(example.SerializeToString())
 
-    d = np.array(np.random.rand(300, 1024), dtype=np.float32)
-    print(d)
-    example = matrix_to_tfexample(
-        d.tostring(), labels=[1, 2], video_id="asf")
-    tfrecord_writer.write(example.SerializeToString())
+    # d = np.array(np.random.rand(1024), dtype=np.float32)
+    # print(d)
+    # example = matrix_to_tfexample(
+        # d.tostring(), labels=[1, 2], video_id="asf")
+    # tfrecord_writer.write(example.SerializeToString())
 
 def read():
-  feature_names = ["rgb", "audio"]
-  files = gfile.Glob("/data/state/linchao/YT/frame/train/*.tfrecord")
+  files = gfile.Glob("/data/uts700/linchao/yt8m/data/video_level/video_level/train/*.tfrecord")
   filename_queue = tf.train.string_input_producer(files,
                                                   shuffle=False, num_epochs=1)
   reader = tf.TFRecordReader()
   _, serialized_example = reader.read(filename_queue)
 
-  contexts, features = tf.parse_single_sequence_example(
+  features = tf.parse_single_example(
       serialized_example,
-      context_features={"video_id": tf.FixedLenFeature(
-          [], tf.string),
-                        "labels": tf.VarLenFeature(tf.int64)},
-      sequence_features={
-          feature_name : tf.FixedLenSequenceFeature([], dtype=tf.string)
-          for feature_name in feature_names
+      features={
+          "video_id": tf.FixedLenFeature([], tf.string),
+          "labels": tf.VarLenFeature(tf.int64),
+          "mean_rgb": tf.FixedLenFeature([1024], tf.float32),
+          "mean_audio": tf.FixedLenFeature([128], tf.float32)
       })
 
-  sparse_labels = contexts["labels"].values
-  video_id = contexts["video_id"]
-  rgb = features["rgb"]
-  audio = features["audio"]
-  rgb = tf.decode_raw(rgb, tf.uint8)
-  audio = tf.decode_raw(audio, tf.uint8)
-
-  '''
-  rgb = tf.reshape(
-        tf.cast(tf.decode_raw(rgb, tf.uint8), tf.float32),
-        tf.cast(tf.decode_raw(rgb, tf.float32), tf.float32),
-        [-1, 1024])
-  '''
+  sparse_labels = features["labels"].values
+  video_id = features["video_id"]
+  rgb = features["mean_rgb"]
+  audio = features["mean_audio"]
 
   with tf.Session() as sess:
     sess.run(tf.local_variables_initializer())
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-    # feas_val, labels, video_id = sess.run([feas, contexts["labels"], contexts["video_id"]])
     cnt = 0
-    output_filename = "/data/state/linchao/YT/frame_25/{}.tfrecord".format(cnt / 1200)
+    output_filename = "/data/state/linchao/YT/video_25/train/{}.tfrecord".format(cnt / 1200)
     tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
     target_labels = set(range(25))
     try:
@@ -100,7 +81,7 @@ def read():
         tfrecord_writer.write(example.SerializeToString())
         if cnt % 1200 == 0:
           tfrecord_writer.close()
-          output_filename = "/data/state/linchao/YT/frame_25/{}.tfrecord".format(cnt / 1200)
+          output_filename = "/data/state/linchao/YT/video_25/train/{}.tfrecord".format(cnt / 1200)
           tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
         cnt += 1
         # print(video_id_v, sparse_labels_v)
@@ -115,34 +96,28 @@ def read():
     coord.join(threads)
 
 def just_read():
-  feature_names = ["rgb", "audio"]
-  filename_queue = tf.train.string_input_producer(["a.tfrecord"],
-  # filename_queue = tf.train.string_input_producer(["../../trainzy.tfrecord"],
+  # filename_queue = tf.train.string_input_producer(["a.tfrecord"],
+  filename_queue = tf.train.string_input_producer(["/Users/ffmpbgrnn/Works/yt/src/trainZy.tfrecord"],
                                                   shuffle=False, num_epochs=1)
   reader = tf.TFRecordReader()
   _, serialized_example = reader.read(filename_queue)
 
-  contexts, features = tf.parse_single_sequence_example(
+  features = tf.parse_single_example(
       serialized_example,
-      context_features={"video_id": tf.FixedLenFeature(
-          [], tf.string),
-                        "labels": tf.VarLenFeature(tf.int64)},
-      sequence_features={
-          feature_name : tf.FixedLenSequenceFeature([], dtype=tf.string)
-          for feature_name in feature_names
+      features={
+          "video_id": tf.FixedLenFeature([], tf.string),
+          "labels": tf.VarLenFeature(tf.int64),
+          "mean_rgb": tf.FixedLenFeature([1024], tf.float32),
+          "mean_audio": tf.FixedLenFeature([128], tf.float32),
       })
 
-  sparse_labels = contexts["labels"].values
-  video_id = contexts["video_id"]
-  rgb = features["rgb"]
-  audio = features["audio"]
+  sparse_labels = features["labels"].values
+  video_id = features["video_id"]
+  rgb = features["mean_rgb"]
+  audio = features["mean_audio"]
 
-  rgb = tf.reshape(
-        tf.cast(tf.decode_raw(rgb, tf.uint8), tf.float32),
-        [-1, 1024])
-  audio = tf.reshape(
-        tf.cast(tf.decode_raw(audio, tf.uint8), tf.float32),
-        [-1, 128])
+  rgb = tf.reshape(rgb, [1024])
+  audio = tf.reshape(audio, [128])
 
   with tf.Session() as sess:
     sess.run(tf.local_variables_initializer())
