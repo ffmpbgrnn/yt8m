@@ -109,8 +109,8 @@ class MoeModel(models.BaseModel):
     num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
 
     self.is_training = is_training
-    if self.is_training:
-      model_input = tf.nn.dropout(model_input, 0.5)
+    # if self.is_training:
+      # model_input = tf.nn.dropout(model_input, 0.5)
     gate_activations = slim.fully_connected(
         model_input,
         vocab_size * (num_mixtures + 1),

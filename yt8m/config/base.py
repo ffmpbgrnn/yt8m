@@ -138,6 +138,6 @@ class BaseConfig(object):
       data_pattern_str = "validate" if self.stage == "eval" else "test"
 
     # data_pattern_str = "train"
-    # self.data_pattern = "/data/state/linchao/YT/{0}/{1}/{1}*.tfrecord".format(
-        # self.input_feat_type, data_pattern_str)
-    self.data_pattern = "/data/uts700/linchao/yt8m/data/video_level_25/train/*.tfrecord"
+    self.data_pattern = "/data/state/linchao/YT/{0}/{1}/{1}*.tfrecord".format(
+        self.input_feat_type, data_pattern_str)
+    # self.data_pattern = "/data/uts700/linchao/yt8m/data/video_level_25/train/*.tfrecord"
