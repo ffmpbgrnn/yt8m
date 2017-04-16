@@ -16,8 +16,8 @@ def matrix_to_tfexample(rgb, audio, labels=[], video_id=None):
       features=tf.train.Features(feature={
           "labels": _int64_feature(labels),
           "video_id": _bytes_feature([video_id]),
-          "mean_rgb": _bytes_feature([rgb]),
-          "mean_audio": _bytes_feature([audio]),
+          "mean_rgb": _float_feature(rgb),
+          "mean_audio": _float_feature(audio),
       }),
   )
 
@@ -28,7 +28,7 @@ def write():
     audio = np.array(np.random.rand(128), dtype=np.float32)
     print(rgb)
     example = matrix_to_tfexample(
-        rgb.tostring(), audio.tostring(), labels=[1, 2], video_id="asf")
+        rgb, audio, labels=[1, 2], video_id="asf")
     tfrecord_writer.write(example.SerializeToString())
 
     # d = np.array(np.random.rand(1024), dtype=np.float32)
@@ -63,7 +63,7 @@ def read():
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     cnt = 0
-    output_filename = "/data/state/linchao/YT/video_25/train/{}.tfrecord".format(cnt / 1200)
+    output_filename = "/data/uts700/linchao/yt8m/data/video_level_25/train/{}.tfrecord".format(cnt / 1200)
     tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
     target_labels = set(range(25))
     try:
@@ -74,14 +74,14 @@ def read():
         sparse_labels_v = target_labels.intersection(set(sparse_labels_v))
         if len(sparse_labels_v) == 0:
           continue
-        rgb_v = rgb_v.tostring()
-        audio_v = audio_v.tostring()
+        rgb_v = rgb_v
+        audio_v = audio_v
         example = matrix_to_tfexample(
             rgb_v, audio_v, labels=sparse_labels_v, video_id=video_id_v)
         tfrecord_writer.write(example.SerializeToString())
         if cnt % 1200 == 0:
           tfrecord_writer.close()
-          output_filename = "/data/state/linchao/YT/video_25/train/{}.tfrecord".format(cnt / 1200)
+          output_filename = "/data/uts700/linchao/yt8m/data/video_level_25/train/{}.tfrecord".format(cnt / 1200)
           tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
         cnt += 1
         # print(video_id_v, sparse_labels_v)
@@ -96,8 +96,8 @@ def read():
     coord.join(threads)
 
 def just_read():
-  # filename_queue = tf.train.string_input_producer(["a.tfrecord"],
-  filename_queue = tf.train.string_input_producer(["/Users/ffmpbgrnn/Works/yt/src/trainZy.tfrecord"],
+  filename_queue = tf.train.string_input_producer(["/tmp/a.tfrecord"],
+  # filename_queue = tf.train.string_input_producer(["/Users/ffmpbgrnn/Works/yt/src/trainZy.tfrecord"],
                                                   shuffle=False, num_epochs=1)
   reader = tf.TFRecordReader()
   _, serialized_example = reader.read(filename_queue)
