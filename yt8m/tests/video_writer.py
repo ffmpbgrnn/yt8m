@@ -38,7 +38,7 @@ def write():
     # tfrecord_writer.write(example.SerializeToString())
 
 def read():
-  stage = "train"
+  stage = "validate"
   start, end = 25, 250
   output_prefix = "/data/uts700/linchao/yt8m/data/video_level_{}-{}/{}".format(start, end, stage)
   files = gfile.Glob("/data/uts700/linchao/yt8m/data/video_level/video_level/{}/*.tfrecord".format(stage))
