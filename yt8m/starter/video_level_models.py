@@ -78,6 +78,7 @@ class MoeModel(models.BaseModel):
     self.var_moving_average_decay = 0
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
+    self.num_max_labels = -1
     self.num_classes = 25
 
   def create_model(self,
