@@ -68,7 +68,7 @@ class LogisticModel(models.BaseModel):
     return {"predictions": preds, "loss": loss}
 
 class MoeConfig(object):
-  moe_num_mixtures = 200
+  moe_num_mixtures = 100
 
 class MoeModel(models.BaseModel):
   """A softmax over a mixture of logistic models (with L2 regularization)."""
