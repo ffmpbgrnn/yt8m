@@ -38,8 +38,9 @@ def write():
     # tfrecord_writer.write(example.SerializeToString())
 
 def read():
-  stage = "validate"
-  output_prefix = "/data/uts700/linchao/yt8m/data/video_level_25/{}".format(stage)
+  stage = "train"
+  start, end = 25, 250
+  output_prefix = "/data/uts700/linchao/yt8m/data/video_level_{}-{}/{}".format(start, end, stage)
   files = gfile.Glob("/data/uts700/linchao/yt8m/data/video_level/video_level/{}/*.tfrecord".format(stage))
   filename_queue = tf.train.string_input_producer(files,
                                                   shuffle=False, num_epochs=1)
@@ -67,7 +68,7 @@ def read():
     cnt = 0
     output_filename = "{}/{}.tfrecord".format(output_prefix, cnt / 1200)
     tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
-    target_labels = set(range(25))
+    target_labels = set(range(start, end))
     try:
       while True:
         video_id_v, sparse_labels_v, rgb_v, audio_v = sess.run([video_id, sparse_labels, rgb, audio])
@@ -76,6 +77,8 @@ def read():
         sparse_labels_v = target_labels.intersection(set(sparse_labels_v))
         if len(sparse_labels_v) == 0:
           continue
+        sparse_labels_v = np.array(list(sparse_labels_v)) - start
+        sparse_labels_v = sparse_labels_v.tolist()
         rgb_v = rgb_v
         audio_v = audio_v
         example = matrix_to_tfexample(
