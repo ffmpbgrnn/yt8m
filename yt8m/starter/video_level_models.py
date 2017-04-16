@@ -68,10 +68,17 @@ class LogisticModel(models.BaseModel):
     return {"predictions": preds, "loss": loss}
 
 class MoeConfig(object):
-  moe_num_mixtures = 2
+  moe_num_mixtures = 100
 
 class MoeModel(models.BaseModel):
   """A softmax over a mixture of logistic models (with L2 regularization)."""
+  def __init__(self):
+    self.normalize_input = True
+    self.clip_global_norm = 1
+    self.var_moving_average_decay = 0
+    self.optimizer_name = "AdamOptimizer"
+    self.base_learning_rate = 1e-2
+    self.num_classes = 25
 
   def create_model(self,
                    model_input,
