@@ -81,7 +81,7 @@ class MoeModel(models.BaseModel):
     self.num_max_labels = -1
     self.num_classes = 25
 
-  def create_model(self,
+  def create_model_V1(self,
                    model_input,
                    vocab_size,
                    num_mixtures=None,
@@ -134,7 +134,7 @@ class MoeModel(models.BaseModel):
                                      [-1, vocab_size])
     return {"predictions": final_probabilities}
 
-  def create_model_V0(self,
+  def create_model(self,
                    model_input,
                    vocab_size,
                    num_mixtures=None,
@@ -162,8 +162,23 @@ class MoeModel(models.BaseModel):
     num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
 
     self.is_training = is_training
-    if self.is_training:
-      model_input = tf.nn.dropout(model_input, 0.8)
+    # if self.is_training:
+      # model_input = tf.nn.dropout(model_input, 0.8)
+    model_input = slim.fully_connected(
+        model_input,
+        1280,
+        activation_fn=tf.nn.relu,
+        biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="input_proj0")
+    model_input = slim.fully_connected(
+        model_input,
+        1280,
+        activation_fn=tf.nn.relu,
+        biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="input_proj1")
+
     gate_activations = slim.fully_connected(
         model_input,
         vocab_size * (num_mixtures + 1),
