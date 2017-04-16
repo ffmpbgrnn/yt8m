@@ -52,7 +52,7 @@ class NetVLAD(models.BaseModel):
                    is_training=True, sparse_labels=None, label_weights=None,
                    dense_labels=None, input_weights=None, **unused_params):
     vlad_att_hidden_size = 100
-    C = 20
+    C = 50
     loss_with_vlad_kmeans = True
     self.vocab_size = vocab_size
 
@@ -68,7 +68,7 @@ class NetVLAD(models.BaseModel):
         [1, 1, fea_size])
     inputs = model_input * input_weights
 
-    inputs = self.context_encoder(inputs, fea_size)
+    # inputs = self.context_encoder(inputs, fea_size)
 
     with tf.variable_scope("centers"):
       center = tf.get_variable("center", shape=[1, C, 1, fea_size], dtype=tf.float32,

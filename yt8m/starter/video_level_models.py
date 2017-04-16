@@ -164,6 +164,7 @@ class MoeModel(models.BaseModel):
     self.is_training = is_training
     # if self.is_training:
       # model_input = tf.nn.dropout(model_input, 0.8)
+    '''
     model_input = slim.fully_connected(
         model_input,
         1280,
@@ -178,6 +179,7 @@ class MoeModel(models.BaseModel):
         biases_initializer=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="input_proj1")
+    '''
 
     gate_activations = slim.fully_connected(
         model_input,
