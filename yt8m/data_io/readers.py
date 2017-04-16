@@ -181,7 +181,18 @@ class YT8MAggregatedFeatureReader(BaseReader):
     # labels = tf.sparse_to_indicator(features["labels"], self.num_classes)
     # labels = tf.zeros((self.num_classes), dtype=tf.float32)
     labels = tf.sparse_to_indicator(features["labels"], 4716)
-    labels = labels[:, 0:25]
+    if self.num_classes == 25:            # 25
+      labels = labels[:, 0: 25]
+    elif self.num_classes == 250 - 25:    # 225
+      labels = labels[:, 25: 250]
+    elif self.num_classes == 1250 - 250:  # 1000
+      labels = labels[:, 250: 1250]
+    elif self.num_classes == 2500 - 1250: # 1250
+      labels = labels[:, 1250: 2500]
+    elif self.num_classes == 3600 - 2500: # 1100
+      labels = labels[:, 2500: 3600]
+    elif self.num_classes == 4716 - 3600: # 1116
+      labels = labels[:, 3600: 4716]
     labels.set_shape([None, self.num_classes])
 
     concatenated_features = tf.concat([
