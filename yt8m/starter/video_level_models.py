@@ -88,6 +88,59 @@ class MoeModel(models.BaseModel):
                    l2_penalty=1e-8,
                    is_training=True,
                    **unused_params):
+    num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
+
+    primary_num_mixtures = 20
+    secondary_num_mixtures = 20
+    gate_primary_activations = slim.fully_connected(
+        model_input,
+        vocab_size * (primary_num_mixtures + 1),
+        activation_fn=None,
+        biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="gates_primary")
+    gate_secondary_activations = slim.fully_connected(
+        model_input,
+        vocab_size * (secondary_num_mixtures + 1),
+        activation_fn=None,
+        biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="gates_secondary")
+
+    expert_activations = slim.fully_connected(
+        model_input,
+        vocab_size * primary_num_mixtures * secondary_num_mixtures,
+        activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
+        scope="experts")
+
+    gating_primary_distribution = tf.nn.softmax(tf.reshape(
+        gate_primary_activations,
+        [-1, primary_num_mixtures + 1]))
+    gating_secondary_distribution = tf.nn.softmax(tf.reshape(
+        gate_secondary_activations,
+        [-1, secondary_num_mixtures + 1]))
+    expert_distribution = tf.nn.sigmoid(tf.reshape(
+        expert_activations,
+        [-1, primary_num_mixtures * secondary_num_mixtures]))
+
+    expert_distribution = tf.reshape(expert_distribution, [-1, primary_num_mixtures, secondary_num_mixtures])
+    gating_primary_distribution = tf.reshape(gating_primary_distribution[:, :primary_num_mixtures], [-1, primary_num_mixtures, 1])
+    gating_secondary_distribution = tf.reshape(gating_secondary_distribution[:, :secondary_num_mixtures], [-1, secondary_num_mixtures, 1])
+
+    final_probabilities_by_class_and_batch = tf.reduce_sum(
+        gating_primary_distribution * gating_secondary_distribution * expert_distribution, [1, 2])
+    final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
+                                     [-1, vocab_size])
+    return {"predictions": final_probabilities}
+
+  def create_model_V0(self,
+                   model_input,
+                   vocab_size,
+                   num_mixtures=None,
+                   l2_penalty=1e-8,
+                   is_training=True,
+                   **unused_params):
     """Creates a Mixture of (Logistic) Experts model.
 
      The model consists of a per-class softmax distribution over a
