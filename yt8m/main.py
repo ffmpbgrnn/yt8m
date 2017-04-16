@@ -134,11 +134,13 @@ class Expr(object):
   def get_reader(self):
     if self.config.input_feat_type == "frame":
       reader = readers.YT8MFrameFeatureReader(
+          num_classes=self.model.num_classes,
           feature_names=self.feature_names,
           num_max_labels=self.model.num_max_labels,
           feature_sizes=self.feature_sizes)
     elif self.config.input_feat_type == "video":
       reader = readers.YT8MAggregatedFeatureReader(
+          num_classes=self.model.num_classes,
           feature_names=self.feature_names,
           num_max_labels=self.model.num_max_labels,
           feature_sizes=self.feature_sizes,)
