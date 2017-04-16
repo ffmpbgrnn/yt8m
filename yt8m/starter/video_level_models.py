@@ -126,7 +126,7 @@ class MoeModel(models.BaseModel):
 
     expert_distribution = tf.reshape(expert_distribution, [-1, primary_num_mixtures, secondary_num_mixtures])
     gating_primary_distribution = tf.reshape(gating_primary_distribution[:, :primary_num_mixtures], [-1, primary_num_mixtures, 1])
-    gating_secondary_distribution = tf.reshape(gating_secondary_distribution[:, :secondary_num_mixtures], [-1, secondary_num_mixtures, 1])
+    gating_secondary_distribution = tf.reshape(gating_secondary_distribution[:, :secondary_num_mixtures], [-1, 1, secondary_num_mixtures])
 
     final_probabilities_by_class_and_batch = tf.reduce_sum(
         gating_primary_distribution * gating_secondary_distribution * expert_distribution, [1, 2])
