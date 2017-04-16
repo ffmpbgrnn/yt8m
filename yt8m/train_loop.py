@@ -59,11 +59,12 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
         variables_to_restore,
         ignore_missing_vars=False,)
 
+  # TODO
   sv = tf.train.Supervisor(logdir=self.config.train_dir,
                            is_chief=self.is_chief,
                            global_step=self.global_step,
-                           save_model_secs=600,
-                           save_summaries_secs=600,
+                           save_model_secs=60,
+                           save_summaries_secs=60,
                            saver=saver,
                            init_fn=init_fn)
   sess = sv.prepare_or_wait_for_session(
