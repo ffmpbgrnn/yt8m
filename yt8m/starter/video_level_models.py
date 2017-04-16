@@ -86,6 +86,7 @@ class MoeModel(models.BaseModel):
                    vocab_size,
                    num_mixtures=None,
                    l2_penalty=1e-8,
+                   is_training=True,
                    **unused_params):
     """Creates a Mixture of (Logistic) Experts model.
 
@@ -107,6 +108,8 @@ class MoeModel(models.BaseModel):
     """
     num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
 
+    if self.is_training:
+      model_input = tf.nn.dropout(model_input, 0.5)
     gate_activations = slim.fully_connected(
         model_input,
         vocab_size * (num_mixtures + 1),
@@ -114,12 +117,16 @@ class MoeModel(models.BaseModel):
         biases_initializer=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="gates")
+    # if self.is_training:
+      # gate_activations = tf.nn.dropout(gate_activations, 0.5)
     expert_activations = slim.fully_connected(
         model_input,
         vocab_size * num_mixtures,
         activation_fn=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="experts")
+    # if self.is_training:
+      # expert_activations = tf.nn.dropout(expert_activations, 0.5)
 
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,
