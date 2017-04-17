@@ -18,10 +18,10 @@ def main(hostname, mem_percent):
         3: 2,}
   elif hostname == "UTS2":
     gpu_id_mapping = {
-        0: 3,
-        1: 2,
-        2: 1,
-        3: 0,}
+        0: 1,
+        1: 0,
+        2: 2,
+        3: 3,}
   elif hostname == "UTS6":
     gpu_id_mapping = {
         0: 3,
