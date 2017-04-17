@@ -79,8 +79,11 @@ class MoeModel(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
     self.num_max_labels = -1
+    # TODO save_model_secs
+    self.num_classes = 25
     # self.num_classes = 2500 - 1250
-    self.num_classes = 3600 - 2500
+    # self.num_classes = 3600 - 2500
+    # self.num_classes = 4716 - 3600
 
   def create_model_V1(self,
                    model_input,
@@ -135,7 +138,56 @@ class MoeModel(models.BaseModel):
                                      [-1, vocab_size])
     return {"predictions": final_probabilities}
 
+  def moe_layer(self, model_input, hidden_size, num_mixtures,
+                act_func=None):
+    gate_activations = slim.fully_connected(
+        model_input,
+        hidden_size * (num_mixtures + 1),
+        activation_fn=None,
+        biases_initializer=None,
+        weights_regularizer=slim.l2_regularizer(self.l2_penalty),
+        scope="gates")
+    expert_activations = slim.fully_connected(
+        model_input,
+        hidden_size * num_mixtures,
+        activation_fn=None,
+        weights_regularizer=slim.l2_regularizer(self.l2_penalty),
+        scope="experts")
+
+    expert_act_func = act_func
+    gating_distribution = tf.nn.softmax(tf.reshape(
+        gate_activations,
+        [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
+    expert_distribution = expert_act_func(tf.reshape(
+        expert_activations,
+        [-1, num_mixtures]))  # (Batch * #Labels) x num_mixtures
+
+    outputs = tf.reduce_sum(
+        gating_distribution[:, :num_mixtures] * expert_distribution, 1)
+    outputs = tf.reshape(outputs, [-1, hidden_size])
+    return outputs
+
   def create_model(self,
+                   model_input,
+                   vocab_size,
+                   num_mixtures=None,
+                   l2_penalty=1e-8,
+                   is_training=True,
+                   **unused_params):
+    num_mixtures = num_mixtures or 100
+
+    self.is_training = is_training
+    self.l2_penalty = l2_penalty
+
+    outputs = self.moe_layer(model_input, 1024, num_mixtures=100, act_func=tf.nn.relu)
+
+    final_probabilities = slim.fully_connected(outputs, vocab_size,
+                                               activation_fn=tf.nn.sigmoid,
+                                               weights_regularizer=slim.l2_regularizer(self.l2_penalty),
+                                               scope="final_output")
+    return {"predictions": final_probabilities}
+
+  def create_model_original(self,
                    model_input,
                    vocab_size,
                    num_mixtures=None,
@@ -182,23 +234,20 @@ class MoeModel(models.BaseModel):
         scope="input_proj1")
     '''
 
+    hidden_size = vocab_size
     gate_activations = slim.fully_connected(
         model_input,
-        vocab_size * (num_mixtures + 1),
+        hidden_size * (num_mixtures + 1),
         activation_fn=None,
         biases_initializer=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="gates")
-    # if self.is_training:
-      # gate_activations = tf.nn.dropout(gate_activations, 0.5)
     expert_activations = slim.fully_connected(
         model_input,
-        vocab_size * num_mixtures,
+        hidden_size * num_mixtures,
         activation_fn=None,
         weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="experts")
-    # if self.is_training:
-      # expert_activations = tf.nn.dropout(expert_activations, 0.5)
 
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,
