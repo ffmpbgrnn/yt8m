@@ -79,7 +79,7 @@ class MoeModel(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 1e-2
     self.num_max_labels = -1
-    self.num_classes = 1250 - 250
+    self.num_classes = 2500 - 1250
 
   def create_model_V1(self,
                    model_input,
