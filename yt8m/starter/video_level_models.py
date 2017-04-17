@@ -80,10 +80,10 @@ class MoeModel(models.BaseModel):
     self.base_learning_rate = 1e-2
     self.num_max_labels = -1
     # TODO save_model_secs
-    self.num_classes = 25
+    # self.num_classes = 25
     # self.num_classes = 2500 - 1250
     # self.num_classes = 3600 - 2500
-    # self.num_classes = 4716 - 3600
+    self.num_classes = 4716 - 3600
 
   def create_model_V1(self,
                    model_input,
@@ -167,7 +167,7 @@ class MoeModel(models.BaseModel):
     outputs = tf.reshape(outputs, [-1, hidden_size])
     return outputs
 
-  def create_model(self,
+  def create_model_new(self,
                    model_input,
                    vocab_size,
                    num_mixtures=None,
@@ -187,7 +187,7 @@ class MoeModel(models.BaseModel):
                                                scope="final_output")
     return {"predictions": final_probabilities}
 
-  def create_model_original(self,
+  def create_model(self,
                    model_input,
                    vocab_size,
                    num_mixtures=None,
