@@ -9,6 +9,7 @@ from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
 
 from yt8m.models import models
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl
+import yt8m.starter.video_level_models as video_level_models
 
 linear = core_rnn_cell_impl._linear  # pylint: disable=protected-access
 
@@ -52,7 +53,7 @@ class NetVLAD(models.BaseModel):
                    is_training=True, sparse_labels=None, label_weights=None,
                    dense_labels=None, input_weights=None, **unused_params):
     vlad_att_hidden_size = 100
-    C = 50
+    C = 20
     loss_with_vlad_kmeans = True
     self.vocab_size = vocab_size
 
@@ -71,9 +72,11 @@ class NetVLAD(models.BaseModel):
     # inputs = self.context_encoder(inputs, fea_size)
 
     with tf.variable_scope("centers"):
+      # TODO
+      center_reg = None # slim.l2_regularizer(1e-5)
       center = tf.get_variable("center", shape=[1, C, 1, fea_size], dtype=tf.float32,
                                initializer=tf.truncated_normal_initializer(stddev=0.01),
-                               regularizer=slim.l2_regularizer(1e-8))
+                               regularizer=center_reg)
     hidden = slim.conv2d(center, vlad_att_hidden_size, [1, 1], activation_fn=None, scope="hidden_conv2d")
 
     v = tf.get_variable("attn_v", [1, 1, 1, vlad_att_hidden_size],
@@ -126,6 +129,10 @@ class NetVLAD(models.BaseModel):
     '''
     outputs = self.normalization(residual, C * fea_size, ssr=True,
                                  intra_norm=True, l2_norm=True, norm_dim=2)
+    outputs = tf.stop_gradient(outputs)
+    moe = video_level_models.MoeModel()
+    outputs = moe.moe_layer(outputs, 1024, num_mixtures=5, act_func=tf.nn.relu)
+
     logits = slim.fully_connected(
         outputs, self.vocab_size, activation_fn=None,
         weights_regularizer=slim.l2_regularizer(1e-8))
@@ -134,21 +141,21 @@ class NetVLAD(models.BaseModel):
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
     loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
     logits = tf.nn.sigmoid(logits)
-    # self.variables_to_restore = slim.get_model_variables()
-    # outputs = tf.stop_gradient(outputs)
-
     '''
-    logits = self.get_final_probs(outputs)
+    # TODO
+    loss += l2_loss * 1e-8
+    # self.variables_to_restore = slim.get_model_variables()
+    '''
+
+    # logits = self.get_final_probs(outputs)
+    '''
     with tf.name_scope("loss_xent"):
-      epsilon = 1e-12
+      epsilon = 1e-6
       cross_entropy_loss = labels * tf.log(logits + epsilon) + (
           1 - labels) * tf.log(1 - logits + epsilon)
       cross_entropy_loss = tf.negative(cross_entropy_loss)
       loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
     '''
-
-    # TODO
-    loss += l2_loss * 1e-8
 
     return {
         "predictions": logits,
@@ -156,10 +163,11 @@ class NetVLAD(models.BaseModel):
     }
 
   def get_train_init_fn(self):
-    return None
+    # TODO
+    # return None
     print('restoring from...')
     return slim.assign_from_checkpoint_fn(
-        "/data/D2DCRC/linchao/YT/log/212/model.ckpt-1625896",
+        "/data/D2DCRC/linchao/YT/log/386/model.ckpt-2712318",
         tf.all_variables(),
         ignore_missing_vars=True)
 
