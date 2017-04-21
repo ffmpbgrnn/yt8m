@@ -19,6 +19,7 @@ import tensorflow.contrib.slim as slim
 import tensorflow as tf
 
 from yt8m.models import models
+from yt8m.models import aucpr
 
 
 class LogisticModel(models.BaseModel):
@@ -190,6 +191,7 @@ class MoeModel(models.BaseModel):
 
   def create_model(self,
                    model_input,
+                   dense_labels=None,
                    vocab_size,
                    num_mixtures=None,
                    l2_penalty=1e-8,
@@ -213,7 +215,7 @@ class MoeModel(models.BaseModel):
       model in the 'predictions' key. The dimensions of the tensor are
       batch_size x num_classes.
     """
-    num_mixtures = num_mixtures or MoeConfig.moe_num_mixtures
+    num_mixtures = 4 #num_mixtures or MoeConfig.moe_num_mixtures
 
     self.is_training = is_training
     # if self.is_training:
@@ -253,7 +255,9 @@ class MoeModel(models.BaseModel):
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,
         [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
+    # TODO
     expert_distribution = tf.nn.sigmoid(tf.reshape(
+    # expert_distribution = tf.nn.sigmoid(tf.reshape(
         expert_activations,
         [-1, num_mixtures]))  # (Batch * #Labels) x num_mixtures
 
@@ -261,7 +265,8 @@ class MoeModel(models.BaseModel):
         gating_distribution[:, :num_mixtures] * expert_distribution, 1)
     final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
                                      [-1, vocab_size])
-    return {"predictions": final_probabilities}
+    loss = aucpr.aucpr_loss(final_probabilities, dense_labels)
+    return {"predictions": final_probabilities, 'loss': loss}
 
 
 class MoeModel_V2(models.BaseModel):

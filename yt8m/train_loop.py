@@ -126,6 +126,8 @@ def get_train_op(self, result, label_loss):
         0.95,
         staircase=True
     )
+    # TODO
+    learning_rate = self.model.base_learning_rate
     tf.summary.scalar('learning_rate', learning_rate)
     opt = self.optimizer(learning_rate)
   for variable in slim.get_model_variables():
@@ -161,6 +163,14 @@ def get_train_op(self, result, label_loss):
   if self.model.clip_global_norm > 0:
     gradients, _ = tf.clip_by_global_norm(gradients, self.model.clip_global_norm)
   gradients = zip(gradients, params)
+  vs, gs = [], []
+  for g, v in gradients:
+    if v.op.name.startswith("AUCPRLambda"):
+      print(v.op.name)
+      g = g * -1.
+    gs.append(g)
+    vs.append(v)
+  gradients = zip(gs, vs)
   train_op = opt.apply_gradients(gradients, self.global_step)
 
   if self.model.var_moving_average_decay > 0:
