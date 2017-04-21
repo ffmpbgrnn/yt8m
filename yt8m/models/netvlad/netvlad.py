@@ -10,6 +10,7 @@ from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
 from yt8m.models import models
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl
 import yt8m.starter.video_level_models as video_level_models
+from tensorflow import logging
 
 linear = core_rnn_cell_impl._linear  # pylint: disable=protected-access
 
@@ -20,7 +21,7 @@ class NetVLAD(models.BaseModel):
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 1e-2 # 4e-3, 3e-4
+    self.base_learning_rate = 1e-3 # 4e-3, 3e-4
     self.max_steps = 300
 
 
@@ -131,11 +132,12 @@ class NetVLAD(models.BaseModel):
                                  intra_norm=True, l2_norm=True, norm_dim=2)
     outputs = tf.stop_gradient(outputs)
     moe = video_level_models.MoeModel()
-    outputs = moe.moe_layer(outputs, 1024, num_mixtures=5, act_func=tf.nn.relu)
+    outputs = moe.moe_layer(outputs, 1024, num_mixtures=5, act_func=tf.nn.relu,
+                            l2_penalty=1e-8)
 
     logits = slim.fully_connected(
         outputs, self.vocab_size, activation_fn=None,
-        weights_regularizer=slim.l2_regularizer(1e-8))
+        weights_regularizer=slim.l2_regularizer(1e-8), scope="outputs")
 
     labels = tf.cast(dense_labels, tf.float32)
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
@@ -165,7 +167,7 @@ class NetVLAD(models.BaseModel):
   def get_train_init_fn(self):
     # TODO
     # return None
-    print('restoring from...')
+    logging.info('restoring from...')
     return slim.assign_from_checkpoint_fn(
         "/data/D2DCRC/linchao/YT/log/386/model.ckpt-2712318",
         tf.all_variables(),

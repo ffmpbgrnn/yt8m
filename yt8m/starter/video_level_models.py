@@ -139,19 +139,19 @@ class MoeModel(models.BaseModel):
     return {"predictions": final_probabilities}
 
   def moe_layer(self, model_input, hidden_size, num_mixtures,
-                act_func=None):
+                act_func=None, l2_penalty=None):
     gate_activations = slim.fully_connected(
         model_input,
         hidden_size * (num_mixtures + 1),
         activation_fn=None,
         biases_initializer=None,
-        weights_regularizer=slim.l2_regularizer(self.l2_penalty),
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="gates")
     expert_activations = slim.fully_connected(
         model_input,
         hidden_size * num_mixtures,
         activation_fn=None,
-        weights_regularizer=slim.l2_regularizer(self.l2_penalty),
+        weights_regularizer=slim.l2_regularizer(l2_penalty),
         scope="experts")
 
     expert_act_func = act_func
@@ -179,7 +179,8 @@ class MoeModel(models.BaseModel):
     self.is_training = is_training
     self.l2_penalty = l2_penalty
 
-    outputs = self.moe_layer(model_input, 1024, num_mixtures=100, act_func=tf.nn.relu)
+    outputs = self.moe_layer(model_input, 1024, num_mixtures=100, act_func=tf.nn.relu,
+                             l2_penalty=self.l2_penalty)
 
     final_probabilities = slim.fully_connected(outputs, vocab_size,
                                                activation_fn=tf.nn.sigmoid,
