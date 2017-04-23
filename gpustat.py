@@ -7,7 +7,7 @@ import time
 
 
 # Ordered by Priority
-GPU_names = ['GeForce GTX TITAN X', 'GeForce GTX 1080', 'GeForce GTX 980 Ti', 'Tesla K40c', 'TITAN X (Pascal)']
+GPU_names = ['GeForce GTX TITAN X', 'GeForce GTX 1080', 'GeForce GTX 980 Ti', 'Tesla K40c', 'TITAN X (Pascal)', 'GeForce GTX 1080 Ti']
 
 def main(hostname, mem_percent):
   if hostname == "UTS7":

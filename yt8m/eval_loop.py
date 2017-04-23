@@ -9,6 +9,25 @@ from tensorflow import logging
 from yt8m.evaluation import eval_util
 import utils
 
+
+def _int64_feature(values):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
+
+def _bytes_feature(values):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=values))
+
+def _float_feature(values):
+    return tf.train.Feature(float_list=tf.train.FloatList(value=values))
+
+def matrix_to_tfexample(feats, labels=[], video_id=None):
+  return tf.train.Example(
+      features=tf.train.Features(feature={
+          "labels": _int64_feature(labels),
+          "video_id": _bytes_feature([video_id]),
+          "feats": _float_feature(feats),
+      }),
+  )
+
 def restore(saver, sess, train_dir):
   last_global_step_val = -1
   latest_checkpoint = tf.train.latest_checkpoint(train_dir)
@@ -40,8 +59,8 @@ def evaluation_loop(self, saver, model_ckpt_path):
   sess_config = tf.ConfigProto()
   sess_config.gpu_options.per_process_gpu_memory_fraction = 0.9
   video_ids = []
-  output_scores = False
-  if output_scores:
+  output_scores = 2 # 1->output score, 2-> output features
+  if output_scores == 1:
     model_id = model_ckpt_path.split("/")[-2]
     # num_insts = 4906660
     # stage = "train"
@@ -53,6 +72,12 @@ def evaluation_loop(self, saver, model_ckpt_path):
     pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.{}.h5".format(model_id, stage), "w")
     pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, self.model.num_classes),
                                             dtype=np.float32)
+  elif output_scores == 2:
+    output_prefix = "/data/uts700/linchao/yt8m/data/555_netvlad/train"
+    tfrecord_cntr = 0
+    output_filename = "{}/{}.tfrecord".format(output_prefix, tfrecord_cntr / 1200)
+    tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
+
   with tf.Session(config=sess_config) as sess:
     saver.restore(sess, model_ckpt_path)
     sess.run([tf.local_variables_initializer()])
@@ -78,10 +103,24 @@ def evaluation_loop(self, saver, model_ckpt_path):
         example_per_second = res["dense_labels"].shape[0] / seconds_per_batch
         examples_processed += res["dense_labels"].shape[0]
         predictions = res["predictions"]
-        if output_scores:
+        if output_scores == 1:
           video_id = res["video_id"].tolist()
           pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
           video_ids += video_id
+        elif output_scores == 2:
+          for i in xrange(len(video_id)):
+            sparse_label = np.array(res["dense_labels"][i], dtype=np.int32)
+            sparse_label = np.where(sparse_label == 1)[0].tolist()
+            feat = res["feats"][i]
+            print(sparse_label, video_id[i])
+            example = matrix_to_tfexample(
+                feat, labels=sparse_label, video_id=video_id[i])
+            tfrecord_writer.write(example.SerializeToString())
+            if tfrecord_cntr % 1200 == 0:
+              tfrecord_writer.close()
+              output_filename = "{}/{}.tfrecord".format(output_prefix, tfrecord_cntr / 1200)
+              tfrecord_writer = tf.python_io.TFRecordWriter(output_filename)
+            tfrecord_cntr += 1
 
         if type(predictions) == list:
           predictions = eval_util.transform_preds(self, predictions)
@@ -116,9 +155,11 @@ def evaluation_loop(self, saver, model_ckpt_path):
       # calculate the metrics for the entire epoch
       epoch_info_dict = evl_metrics.get()
       epoch_info_dict["epoch_id"] = global_step_val
-      if output_scores:
+      if output_scores == 1:
         pred_out.close()
         pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
+      elif output_scores == 2:
+        tfrecord_writer.close()
 
       if summary_writer:
         summary_writer.add_summary(res["summary"], global_step_val)

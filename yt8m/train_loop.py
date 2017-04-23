@@ -83,7 +83,7 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
     while not sv.should_stop():
       batch_start_time = time.time()
       res = sess.run(self.feed_out)
-      res = sess.run(self.feed_out1)
+      # res = sess.run(self.feed_out1)
       seconds_per_batch = time.time() - batch_start_time
       examples_per_second = res["dense_labels"].shape[0] / seconds_per_batch
 
@@ -179,7 +179,7 @@ def get_train_op(self, result, label_loss):
   gradients = zip(other_gs, other_vs)
   train_op = opt.apply_gradients(gradients, self.global_step)
 
-  global_norm = tf.global_norm(auc_gs)
+  global_norm1 = tf.global_norm(auc_gs)
   auc_gs, _ = tf.clip_by_global_norm(auc_gs, 1)
   gradients = zip(auc_gs, auc_vs)
   learning_rate = tf.train.exponential_decay(
@@ -190,7 +190,9 @@ def get_train_op(self, result, label_loss):
         staircase=True
     )
   opt1 = tf.train.GradientDescentOptimizer(learning_rate)
-  train_op1 = opt1.apply_gradients(gradients, self.global_step1)
+  train_op1 = tf.no_op(name="train_op1")
+  if len(gradients) > 0:
+    train_op1 = opt1.apply_gradients(gradients, self.global_step1)
 
   if self.model.var_moving_average_decay > 0:
     print("moving average")

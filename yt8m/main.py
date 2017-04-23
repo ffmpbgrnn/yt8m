@@ -11,6 +11,7 @@ from yt8m.models.lstm import lstm
 from yt8m.models.lstm import lstm_enc_dec
 from yt8m.models.lstm import skip_thought
 from yt8m.models.lstm import lstm_memnet
+from yt8m.models.lstm import h_lstm
 from yt8m.models.label_bias import binary_cls
 from yt8m.models.noisy_label import noisy_label
 from yt8m.models.vlad import prune_cls
@@ -53,7 +54,8 @@ class Expr(object):
 
     self.model = utils.find_class_by_name(self.config.model_name,
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
-         lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls])()
+         lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls,
+         h_lstm])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
@@ -211,6 +213,8 @@ class Expr(object):
           "dense_labels": dense_labels_batch,
           "loss": label_loss
         }
+        if "feats" in result.keys():
+          self.feed_out['feats'] = result['feats']
       elif self.stage == "inference":
         self.feed_out = {
           "video_id": video_id_batch,
