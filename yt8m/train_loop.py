@@ -83,6 +83,7 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
     while not sv.should_stop():
       batch_start_time = time.time()
       res = sess.run(self.feed_out)
+      res = sess.run(self.feed_out1)
       seconds_per_batch = time.time() - batch_start_time
       examples_per_second = res["dense_labels"].shape[0] / seconds_per_batch
 
@@ -159,21 +160,40 @@ def get_train_op(self, result, label_loss):
   # train_op = optimizer.minimize(final_loss, global_step=global_step)
   params = tf.trainable_variables()
   gradients = tf.gradients(final_loss, params)
-  global_norm = tf.global_norm(gradients)
-  if self.model.clip_global_norm > 0:
-    gradients, _ = tf.clip_by_global_norm(gradients, self.model.clip_global_norm)
   gradients = zip(gradients, params)
-  vs, gs = [], []
+  auc_vs, auc_gs = [], []
+  other_vs, other_gs = [], []
   for g, v in gradients:
     if v.op.name.startswith("AUCPRLambda"):
       print(v.op.name)
       g = g * -1.
-    gs.append(g)
-    vs.append(v)
-  gradients = zip(gs, vs)
+      auc_gs.append(g)
+      auc_vs.append(v)
+    else:
+      other_gs.append(g)
+      other_vs.append(v)
+
+  global_norm = tf.global_norm(other_gs)
+  if self.model.clip_global_norm > 0:
+    other_gs, _ = tf.clip_by_global_norm(other_gs, self.model.clip_global_norm)
+  gradients = zip(other_gs, other_vs)
   train_op = opt.apply_gradients(gradients, self.global_step)
 
+  global_norm = tf.global_norm(auc_gs)
+  auc_gs, _ = tf.clip_by_global_norm(auc_gs, 1)
+  gradients = zip(auc_gs, auc_vs)
+  learning_rate = tf.train.exponential_decay(
+        1e-4,
+        self.global_step1 * self.batch_size,
+        100000,
+        0.99,
+        staircase=True
+    )
+  opt1 = tf.train.GradientDescentOptimizer(learning_rate)
+  train_op1 = opt1.apply_gradients(gradients, self.global_step1)
+
   if self.model.var_moving_average_decay > 0:
+    print("moving average")
     variable_averages = tf.train.ExponentialMovingAverage(
       self.model.var_moving_average_decay, self.global_step)
     variables_to_average = (tf.trainable_variables() +
@@ -181,7 +201,7 @@ def get_train_op(self, result, label_loss):
     variables_averages_op = variable_averages.apply(variables_to_average)
     train_op = tf.group(train_op, variables_averages_op)
 
-  return train_op, label_loss, global_norm
+  return train_op, train_op1, label_loss, global_norm
 
 def recover_session(self):
   # Recover session

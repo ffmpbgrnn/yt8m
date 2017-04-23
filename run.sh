@@ -17,7 +17,8 @@ gpu_id=`python gpustat.py $hostname $stage`
 export CUDA_VISIBLE_DEVICES=$gpu_id;
 echo "Using GPU $CUDA_VISIBLE_DEVICES"
 
-source /home/linchao/tf/whl/04.07.2017_py2/bin/activate; python -m yt8m.main \
+#source /home/linchao/tf/whl/04.07.2017_py2/bin/activate;
+python -m yt8m.main \
     --stage=$stage \
     --model_ckpt_path=$model_ckpt_path \
     --config_name="BaseConfig"

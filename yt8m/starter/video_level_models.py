@@ -78,13 +78,14 @@ class MoeModel(models.BaseModel):
     self.clip_global_norm = 1
     self.var_moving_average_decay = 0
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 1e-2
+    self.base_learning_rate = 1e-3
     self.num_max_labels = -1
     # TODO save_model_secs
     # self.num_classes = 25
     # self.num_classes = 2500 - 1250
     # self.num_classes = 3600 - 2500
-    self.num_classes = 4716 - 3600
+    # self.num_classes = 4716 - 3600
+    self.num_classes = 4716
 
   def create_model_V1(self,
                    model_input,
@@ -191,8 +192,8 @@ class MoeModel(models.BaseModel):
 
   def create_model(self,
                    model_input,
-                   dense_labels=None,
                    vocab_size,
+                   dense_labels=None,
                    num_mixtures=None,
                    l2_penalty=1e-8,
                    is_training=True,
@@ -215,7 +216,7 @@ class MoeModel(models.BaseModel):
       model in the 'predictions' key. The dimensions of the tensor are
       batch_size x num_classes.
     """
-    num_mixtures = 4 #num_mixtures or MoeConfig.moe_num_mixtures
+    num_mixtures = 2 #num_mixtures or MoeConfig.moe_num_mixtures
 
     self.is_training = is_training
     # if self.is_training:
@@ -257,7 +258,6 @@ class MoeModel(models.BaseModel):
         [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
     # TODO
     expert_distribution = tf.nn.sigmoid(tf.reshape(
-    # expert_distribution = tf.nn.sigmoid(tf.reshape(
         expert_activations,
         [-1, num_mixtures]))  # (Batch * #Labels) x num_mixtures
 

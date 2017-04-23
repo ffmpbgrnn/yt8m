@@ -155,6 +155,7 @@ class Expr(object):
     with tf.device(tf.train.replica_device_setter(
         self.ps_tasks, merge_devices=True)):
       self.global_step = tf.Variable(0, trainable=False, name="global_step", dtype=tf.int64)
+      self.global_step1 = tf.Variable(0, trainable=False, name="global_step1", dtype=tf.int64)
 
       video_id_batch, model_input_raw, dense_labels_batch, sparse_labels_batch, num_frames, label_weights_batch, input_weights_batch = inputs
       feature_dim = len(model_input_raw.get_shape()) - 1
@@ -186,11 +187,19 @@ class Expr(object):
           label_loss = self.label_loss_fn.calculate_loss(predictions, dense_labels_batch)
 
       if self.stage == "train":
-        train_op, label_loss, global_norm = train_loop.get_train_op(self, result, label_loss)
+        train_op, train_op1, label_loss, global_norm = train_loop.get_train_op(self, result, label_loss)
         self.feed_out = {
             "train_op": train_op,
             "loss": label_loss,
             "global_step": self.global_step,
+            "predictions": predictions,
+            "dense_labels": dense_labels_batch,
+            "global_norm": global_norm,
+        }
+        self.feed_out1 = {
+            "train_op1": train_op1,
+            "loss": label_loss,
+            "global_step": self.global_step1,
             "predictions": predictions,
             "dense_labels": dense_labels_batch,
             "global_norm": global_norm,
