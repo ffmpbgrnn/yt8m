@@ -59,7 +59,7 @@ def evaluation_loop(self, saver, model_ckpt_path):
   sess_config = tf.ConfigProto()
   sess_config.gpu_options.per_process_gpu_memory_fraction = 0.9
   video_ids = []
-  output_scores = 2 # 1->output score, 2-> output features
+  output_scores = 0 # 1->output score, 2-> output features
   if output_scores == 1:
     model_id = model_ckpt_path.split("/")[-2]
     # num_insts = 4906660
@@ -103,8 +103,8 @@ def evaluation_loop(self, saver, model_ckpt_path):
         example_per_second = res["dense_labels"].shape[0] / seconds_per_batch
         examples_processed += res["dense_labels"].shape[0]
         predictions = res["predictions"]
+        video_id = res["video_id"].tolist()
         if output_scores == 1:
-          video_id = res["video_id"].tolist()
           pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
           video_ids += video_id
         elif output_scores == 2:

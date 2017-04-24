@@ -42,6 +42,7 @@ class BaseConfig(object):
         "MoeModel_V2",
         "NoisyLabelModel",
         "PruneCls",
+        "HLSTMEncoder",
     ]
     self.label_smoothing = False
 
@@ -69,9 +70,9 @@ class BaseConfig(object):
     # self.input_feat_type = "vlad"
     # self.use_hdfs = True
 
-    self.model_name = "MoeModel"
-    self.input_feat_type = "video"
-    self.use_hdfs = False
+    # self.model_name = "MoeModel"
+    # self.input_feat_type = "video"
+    # self.use_hdfs = False
 
     # self.model_name = "LSTMMemNet"
     # self.input_feat_type = "frame"
@@ -80,6 +81,15 @@ class BaseConfig(object):
     # self.model_name = "SkipThought"
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
+
+    # self.model_name = "HLSTMEncoder"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+
+    self.model_name = "FusionModel"
+    self.input_feat_type = "score"
+    self.use_hdfs = False
+
 
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"
@@ -102,7 +112,7 @@ class BaseConfig(object):
       if self.model_name == "LogisticModel":
         self.num_epochs = 5
       # TODO
-      self.batch_size = 128
+      self.batch_size = 1024
     else:
       self.num_readers = 1
       self.num_epochs = 1
@@ -117,9 +127,10 @@ class BaseConfig(object):
 
 
   def input_setup(self):
-    train_dir = "/data/D2DCRC/linchao/YT/log/"
-    # code_saver_dir = "/data/state/linchao/yt8m_src_log"
-    code_saver_dir = "/data/D2DCRC/linchao/YT/log/"
+    train_dir = "/home/linczhu/yt/log/"
+    code_saver_dir = "/home/linczhu/yt/log/"
+    # train_dir = "/data/D2DCRC/linchao/YT/log/"
+    # code_saver_dir = "/data/D2DCRC/linchao/YT/log/"
     if self.stage == "train":
       self.phase_train = True
       data_pattern_str = "train"
@@ -140,4 +151,6 @@ class BaseConfig(object):
     # data_pattern_str = "train"
     self.data_pattern = "/data/state/linchao/YT/{0}/{1}/{1}*.tfrecord".format(
         self.input_feat_type, data_pattern_str)
-    # self.data_pattern = "/data/uts700/linchao/yt8m/data/video_level_25/train/*.tfrecord"
+    # TODO
+    if self.input_feat_type == "score":
+      self.data_pattern = "/home/linczhu/yt/scores/fusion/*.tfrecord"

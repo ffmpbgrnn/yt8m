@@ -78,14 +78,16 @@ class MoeModel(models.BaseModel):
     self.clip_global_norm = 1
     self.var_moving_average_decay = 0
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 1e-3
+    self.base_learning_rate = 1e-2
     self.num_max_labels = -1
     # TODO save_model_secs
     # self.num_classes = 25
     # self.num_classes = 2500 - 1250
     # self.num_classes = 3600 - 2500
     # self.num_classes = 4716 - 3600
-    self.num_classes = 4716
+    # self.num_classes = 4716
+
+    self.num_classes = 503 # 500 - 508
 
   def create_model_V1(self,
                    model_input,
@@ -216,7 +218,7 @@ class MoeModel(models.BaseModel):
       model in the 'predictions' key. The dimensions of the tensor are
       batch_size x num_classes.
     """
-    num_mixtures = 2 #num_mixtures or MoeConfig.moe_num_mixtures
+    num_mixtures = 200 #num_mixtures or MoeConfig.moe_num_mixtures
 
     self.is_training = is_training
     # if self.is_training:
@@ -265,6 +267,8 @@ class MoeModel(models.BaseModel):
         gating_distribution[:, :num_mixtures] * expert_distribution, 1)
     final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
                                      [-1, vocab_size])
+    return {"predictions": final_probabilities}
+    # TODO
     loss = aucpr.aucpr_loss(final_probabilities, dense_labels)
     return {"predictions": final_probabilities, 'loss': loss}
 

@@ -56,6 +56,7 @@ def eval_local():
     time.sleep(5)
 
 def get_score():
+  train_dir = "/Users/ffmpbgrnn/ytlog/log/{}".format(run_id)
   files = os.listdir(train_dir)
   scores = {}
   for f in files:

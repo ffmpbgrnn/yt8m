@@ -181,6 +181,25 @@ class YT8MAggregatedFeatureReader(BaseReader):
     # labels = tf.sparse_to_indicator(features["labels"], self.num_classes)
     # labels = tf.zeros((self.num_classes), dtype=tf.float32)
     labels = tf.sparse_to_indicator(features["labels"], 4716)
+    if self.num_classes == 500:            # 500
+      labels = labels[:, 0: 500]
+    if self.num_classes == 501:            # 501
+      labels = labels[:, 500: 1001]
+    if self.num_classes == 502:            # 502
+      labels = labels[:, 1001: 1503]
+    if self.num_classes == 503:            # 503
+      labels = labels[:, 1503: 2006]
+    if self.num_classes == 504:            # 504
+      labels = labels[:, 2006: 2510]
+    if self.num_classes == 505:            # 505
+      labels = labels[:, 2510: 3015]
+    if self.num_classes == 506:            # 506
+      labels = labels[:, 3015: 3521]
+    if self.num_classes == 507:            # 507
+      labels = labels[:, 3521: 4028]
+    if self.num_classes == 508:            # 508
+      labels = labels[:, 4028: 4716]
+    '''
     if self.num_classes == 25:            # 25
       labels = labels[:, 0: 25]
     elif self.num_classes == 250 - 25:    # 225
@@ -193,6 +212,7 @@ class YT8MAggregatedFeatureReader(BaseReader):
       labels = labels[:, 2500: 3600]
     elif self.num_classes == 4716 - 3600: # 1116
       labels = labels[:, 3600: 4716]
+    '''
     labels.set_shape([None, self.num_classes])
 
     concatenated_features = tf.concat([
@@ -374,3 +394,38 @@ class YT8MFrameFeatureReader(BaseReader):
 
     return batch_video_ids, batch_video_matrix, batch_dense_labels, batch_sparse_labels, \
            batch_frames, batch_label_weights, batch_input_weights
+
+class YT8MScoreFeatureReader(BaseReader):
+  def __init__(self,
+               num_classes=4716,
+               feature_sizes=[1024],
+               feature_names=["mean_inc3"],
+               num_max_labels=-1):
+    self.num_classes = num_classes
+    self.feature_sizes = feature_sizes
+    self.feature_names = feature_names
+    self.num_max_labels = num_max_labels
+
+  def prepare_reader(self, filename_queue, batch_size=1024):
+    reader = tf.TFRecordReader()
+    _, serialized_examples = reader.read_up_to(filename_queue, batch_size)
+
+
+    feature_map = {"video_id": tf.FixedLenFeature([], tf.string),
+                   "labels": tf.VarLenFeature(tf.int64),
+                   "scores": tf.FixedLenFeature([5 * 4716], tf.float32)}
+
+    features = tf.parse_example(serialized_examples, features=feature_map)
+    labels = tf.sparse_to_indicator(features["labels"], 4716)
+    labels.set_shape([None, self.num_classes])
+
+    concatenated_features = features['scores']
+    sparse_labels, label_weights, input_weights = labels, labels, labels
+
+    # sparse_labels = features["labels"].values
+    if self.num_max_labels == 4716:
+      sparse_labels, label_weights = tf.py_func(gen_sparse_label_batch, [labels], [tf.int64, tf.float32])
+      sparse_labels = tf.reshape(sparse_labels, [-1, self.num_max_labels])
+      label_weights = tf.reshape(label_weights, [-1, self.num_max_labels])
+
+    return features["video_id"], concatenated_features, labels, sparse_labels, tf.ones([tf.shape(serialized_examples)[0]]), label_weights, input_weights

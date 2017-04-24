@@ -83,7 +83,8 @@ def train_loop(self, model_ckpt_path, init_fn=None, start_supervisor_services=Tr
     while not sv.should_stop():
       batch_start_time = time.time()
       res = sess.run(self.feed_out)
-      # res = sess.run(self.feed_out1)
+      if self.feed_out1["train_op1"] is not None:
+        res = sess.run(self.feed_out1)
       seconds_per_batch = time.time() - batch_start_time
       examples_per_second = res["dense_labels"].shape[0] / seconds_per_batch
 
@@ -123,7 +124,7 @@ def get_train_op(self, result, label_loss):
     learning_rate = tf.train.exponential_decay(
         self.model.base_learning_rate,
         self.global_step * self.batch_size,
-        1000000,
+        4000000,
         0.95,
         staircase=True
     )
@@ -190,7 +191,7 @@ def get_train_op(self, result, label_loss):
         staircase=True
     )
   opt1 = tf.train.GradientDescentOptimizer(learning_rate)
-  train_op1 = tf.no_op(name="train_op1")
+  train_op1 = None
   if len(gradients) > 0:
     train_op1 = opt1.apply_gradients(gradients, self.global_step1)
 

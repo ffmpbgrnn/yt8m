@@ -12,6 +12,7 @@ from yt8m.models.lstm import lstm_enc_dec
 from yt8m.models.lstm import skip_thought
 from yt8m.models.lstm import lstm_memnet
 from yt8m.models.lstm import h_lstm
+from yt8m.models.fusion import fusion
 from yt8m.models.label_bias import binary_cls
 from yt8m.models.noisy_label import noisy_label
 from yt8m.models.vlad import prune_cls
@@ -55,7 +56,7 @@ class Expr(object):
     self.model = utils.find_class_by_name(self.config.model_name,
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
          lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls,
-         h_lstm])()
+         h_lstm, fusion])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
@@ -151,6 +152,12 @@ class Expr(object):
       reader = vlad_reader.YT8MVLADFeatureReader(
           feature_names=self.feature_names,
           feature_sizes=self.feature_sizes)
+    elif self.config.input_feat_type == "score":
+      reader = readers.YT8MScoreFeatureReader(
+          num_classes=self.model.num_classes,
+          feature_names=self.feature_names,
+          num_max_labels=self.model.num_max_labels,
+          feature_sizes=self.feature_sizes,)
     return reader
 
   def build_graph(self, inputs):
