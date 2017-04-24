@@ -102,6 +102,9 @@ class BaseConfig(object):
     elif self.input_feat_type == "vlad":
       self.feature_names = "feas"
       self.feature_sizes = "65536"
+    else:
+      self.feature_names = "shit"
+      self.feature_sizes = "0"
 
     self.stage = stage
     self.input_setup()

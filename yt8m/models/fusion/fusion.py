@@ -29,8 +29,8 @@ class FusionModel(models.BaseModel):
     self.normalize_input = True
     self.clip_global_norm = 1
     self.var_moving_average_decay = 0
-    self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 1e-2
+    self.optimizer_name = "GradientDescentOptimizer"
+    self.base_learning_rate = 1e-4
     self.num_max_labels = -1
 
     self.num_classes = 4716
@@ -45,10 +45,11 @@ class FusionModel(models.BaseModel):
                    is_training=True,
                    **unused_params):
     num_models = 5
-    w = tf.get_variable("weights", [num_models, 4716], regularizer=slim.l2_regularizer(1e-8),
-                        initializer=tf.constant_initializer(1./num_models))
-    b = tf.get_variable("biases", [4716], initializer=tf.constant_initializer(0.))
-    w = tf.nn.softmax(w, axis=0)
-    logits = tf.reshape(model_input, [num_models, 4716]) * w + b
+    w = tf.get_variable("weights", [1, num_models, 4716], regularizer=slim.l2_regularizer(1e-8),)
+                        # initializer=tf.constant_initializer(1./num_models))
+    b = tf.get_variable("biases", [1, num_models, 4716], initializer=tf.constant_initializer(0.))
+    w = tf.nn.softmax(w, dim=1)
+    logits = tf.reshape(model_input, [-1, num_models, 4716]) * w + b
+    logits = tf.reduce_sum(logits, [1])
     loss = aucpr.aucpr_loss(logits, dense_labels)
     return {"predictions": logits, 'loss': loss}
