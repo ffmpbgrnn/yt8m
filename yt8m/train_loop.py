@@ -181,13 +181,13 @@ def get_train_op(self, result, label_loss):
   train_op = opt.apply_gradients(gradients, self.global_step)
 
   global_norm1 = tf.global_norm(auc_gs)
-  auc_gs, _ = tf.clip_by_global_norm(auc_gs, 1)
+  auc_gs, _ = tf.clip_by_global_norm(auc_gs, 0.1)
   gradients = zip(auc_gs, auc_vs)
   learning_rate = tf.train.exponential_decay(
-        1e-4,
+        1e-3,
         self.global_step1 * self.batch_size,
-        100000,
-        0.99,
+        400000,
+        0.95,
         staircase=True
     )
   opt1 = tf.train.GradientDescentOptimizer(learning_rate)

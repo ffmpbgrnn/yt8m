@@ -92,50 +92,52 @@ def hinge_loss(labels, predictions, b=1.0):
     float_labels = 2 * tf.cast(labels, tf.float32) - 1
     hinge_loss = tf.nn.relu(1 - float_labels * (predictions - b))
     # TODO
-    hinge_loss = hinge_loss * hinge_loss
+    # hinge_loss = hinge_loss * hinge_loss
     return hinge_loss
     # return tf.reduce_mean(tf.reduce_sum(hinge_loss, 1))
 
 def aucpr_loss(scores, labels):
   num_thresholds = 10
+  precisions = tf.constant([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95])
+  # num_thresholds = 5
+  # precisions = tf.constant([0, 0.2, 0.4, 0.6, 0.8, 0.95])
   with tf.variable_scope("AUCPRLambda"):
-    lambda_t = tf.get_variable("lambda_{}".format(0), [num_thresholds+1],
-                               regularizer=slim.l2_regularizer(1e-5),
-                               initializer=tf.constant_initializer(0.005))
+    lambda_t = tf.get_variable("lambda", [num_thresholds],
+                               regularizer=slim.l2_regularizer(1e-5),)
+                               # initializer=tf.constant_initializer(1.))
     lambda_t = tf.maximum(0., lambda_t)
                                 # initializer=tf.constant_initializer(0.5))
-
   top_k = 20
   _, top_idxs = tf.nn.top_k(scores, k=top_k)
-  batch_size = tf.shape(scores)[0]
-  batch_index = tf.tile(
-      tf.expand_dims(tf.range(batch_size), 1), [1, top_k])
 
-  top_idxs= tf.stack([batch_index, top_idxs], 2)
+  batch_size = tf.shape(scores)[0]
+  top_batch_index = tf.tile(
+      tf.expand_dims(tf.range(batch_size), 1), [1, top_k])
+  top_idxs= tf.stack([top_batch_index, top_idxs], 2)
   top_scores = tf.gather_nd(scores, top_idxs,
                           name='top_scores')
   top_labels = tf.gather_nd(labels, top_idxs,
                           name='top_labels')
   top_scores = tf.cast(tf.reshape(top_scores, [-1]), dtype=tf.float32)
   top_labels = tf.cast(tf.reshape(top_labels, [-1]), dtype=tf.int32)
+
   # top_scores = tf.cast(tf.reshape(scores, [-1]), dtype=tf.float32)
   # top_labels = tf.cast(tf.reshape(labels, [-1]), dtype=tf.int32)
 
-  num_thresholds_cal = 500
+  num_thresholds_cal = 200
   kepsilon = 1e-7  # to account for floating point imprecisions
   thresholds = [(i + 1) * 1.0 / (num_thresholds_cal - 1)
                 for i in range(num_thresholds_cal-2)]
   thresholds = [0.0 - kepsilon] + thresholds + [1.0 + kepsilon]
   # top_labels = tf.Print(top_labels, [tf.reduce_sum(top_labels), tf.reduce_sum(top_labels)])
+  # top_labels = tf.Print(top_labels, [top_labels, top_scores[:4], top_scores[-6:-3], top_scores[-3:]])
   # TODO
   _precisions_un, _precisions = precision_at_thresholds(labels=top_labels, predictions=top_scores, thresholds=thresholds)
   # _precisions_un, _precisions = tf.metrics.precision_at_thresholds(labels=top_labels, predictions=top_scores, thresholds=thresholds)
   # _precisions_un, _precisions = tf.contrib.metrics.streaming_precision_at_thresholds(labels=top_labels, predictions=top_scores, thresholds=thresholds)
 
-  # top_labels = tf.Print(top_labels, [top_labels, top_scores[:4], top_scores[-6:-3], top_scores[-3:]])
   # _recalls, _ = tf.metrics.recall_at_thresholds(top_labels, top_scores, thresholds)
 
-  precisions = tf.constant([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95])
 
   # _precisions = tf.Print(_precisions, [tf.reduce_sum(_precisions)])
   # _precisions = tf.Print(_precisions, [_precisions[:3], _precisions[3:6], _precisions[-3:]])
@@ -160,8 +162,9 @@ def aucpr_loss(scores, labels):
   # # thresholds = tf.nn.softmax(thresholds)
   # thresholds, _ = tf.nn.top_k(thresholds, k=num_thresholds)
   # thresholds = tf.Print(thresholds, [thresholds])
-
+  # top_labels = tf.Print(top_labels, [top_labels[0], top_labels[1], top_labels[2]])
   num_pos = tf.cast(tf.reduce_sum(top_labels), dtype=tf.float32)
+  num_pos = tf.cast(tf.reduce_sum(labels), dtype=tf.float32)
   # num_pos = tf.Print(num_pos, [num_pos])
   # lambda_t = tf.Print(lambda_t, [lambda_t[1], lambda_t[2], lambda_t[3], lambda_t[4], lambda_t[5], lambda_t[6], lambda_t[7], lambda_t[8], lambda_t[9], ])
   total_loss = 0.
@@ -174,7 +177,11 @@ def aucpr_loss(scores, labels):
     l_p = tf.reduce_sum(loss * pos_label)
     l_n = tf.reduce_sum(loss * neg_label)
 
-    tmp = (1 + lambda_t[i]) * l_p + lambda_t[i] * precisions[i] / (1. - precisions[i]) * l_n - lambda_t[i] * num_pos
-    # delta_t = tf.Print(delta_t, [delta_t, tmp])
+    lambda_t_value = lambda_t[i - 1]
+    _a = (1 + lambda_t_value) * l_p
+    _b = lambda_t_value * precisions[i] / (1. - precisions[i]) * l_n
+    _c = lambda_t_value * num_pos
+    # _a = tf.Print(_a, [l_p, l_n, num_pos])
+    tmp = _a + _b - _c
     total_loss += delta_t * tmp
   return total_loss

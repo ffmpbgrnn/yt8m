@@ -162,9 +162,11 @@ class MoeModel(models.BaseModel):
     gating_distribution = tf.nn.softmax(tf.reshape(
         gate_activations,
         [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
-    expert_distribution = expert_act_func(tf.reshape(
+    expert_distribution = tf.reshape(
         expert_activations,
-        [-1, num_mixtures]))  # (Batch * #Labels) x num_mixtures
+        [-1, num_mixtures])  # (Batch * #Labels) x num_mixtures
+    if expert_act_func is not None:
+      expert_distribution = expert_act_func(expert_distribution)
 
     outputs = tf.reduce_sum(
         gating_distribution[:, :num_mixtures] * expert_distribution, 1)

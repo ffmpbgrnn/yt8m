@@ -25,6 +25,7 @@ from yt8m.models import models
 import yt8m.models.model_utils as utils
 from tensorflow.contrib.cudnn_rnn.python.ops import cudnn_rnn_ops
 from tensorflow.contrib.rnn.python.ops import gru_ops
+from yt8m.starter import video_level_models
 
 slim = tf.contrib.slim
 
@@ -49,6 +50,7 @@ class HLSTMEncoder(models.BaseModel):
     # dec_cell = self.get_dec_cell(self.cell_size)
     runtime_batch_size = tf.shape(model_input)[0]
 
+    moe = video_level_models.MoeModel()
     with tf.variable_scope("EncLayer0"):
       first_enc_cell = self.get_enc_cell(self.cell_size, vocab_size) # TODO
       enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
@@ -65,6 +67,10 @@ class HLSTMEncoder(models.BaseModel):
         initial_state = tf.stop_gradient(initial_state)
         enc_outputs, enc_state = tf.nn.dynamic_rnn(
             first_enc_cell, model_input_splits[i], initial_state=initial_state, scope="enc0")
+        # TODO
+        enc_state = moe.moe_layer(enc_state, 1024, 2, act_func=None, l2_penalty=1e-12)
+        if is_training:
+          enc_state = tf.nn.dropout(enc_state, 0.8)
         first_layer_outputs.append(enc_state)
 
     with tf.variable_scope("EncLayer1"):
@@ -73,7 +79,12 @@ class HLSTMEncoder(models.BaseModel):
       first_layer_outputs = tf.stack(first_layer_outputs, axis=1)
       enc_outputs, enc_state = tf.nn.dynamic_rnn(
           second_enc_cell, first_layer_outputs, initial_state=enc_init_state, scope="enc1")
-
+    # TODO
+    if is_training:
+      enc_state = tf.nn.dropout(enc_state, 0.8)
+    logits = moe.moe_layer(enc_state, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    return {"predictions": logits}
+    '''
     logits = slim.fully_connected(
         enc_state, vocab_size, activation_fn=None,
         weights_regularizer=slim.l2_regularizer(1e-8))
@@ -82,6 +93,7 @@ class HLSTMEncoder(models.BaseModel):
     loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
     logits = tf.nn.sigmoid(logits)
     return {"predictions": logits, 'loss': loss}
+    '''
 
   def get_enc_cell(self, cell_size, vocab_size):
     # cell = cudnn_rnn_ops.CudnnGRU(1, cell_size, (1024+128))

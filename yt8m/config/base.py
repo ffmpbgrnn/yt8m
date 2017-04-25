@@ -43,8 +43,10 @@ class BaseConfig(object):
         "NoisyLabelModel",
         "PruneCls",
         "HLSTMEncoder",
+        "FusionModel",
     ]
     self.label_smoothing = False
+    self.batch_size = None
 
     # self.model_name = "NoisyLabelModel"
     # self.input_feat_type = "video"
@@ -85,6 +87,7 @@ class BaseConfig(object):
     # self.model_name = "HLSTMEncoder"
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
+    # self.batch_size = 128
 
     self.model_name = "FusionModel"
     self.input_feat_type = "score"
@@ -115,7 +118,8 @@ class BaseConfig(object):
       if self.model_name == "LogisticModel":
         self.num_epochs = 5
       # TODO
-      self.batch_size = 1024
+      if self.batch_size is None:
+        self.batch_size = 1024
     else:
       self.num_readers = 1
       self.num_epochs = 1
@@ -132,8 +136,8 @@ class BaseConfig(object):
   def input_setup(self):
     train_dir = "/home/linczhu/yt/log/"
     code_saver_dir = "/home/linczhu/yt/log/"
-    # train_dir = "/data/D2DCRC/linchao/YT/log/"
-    # code_saver_dir = "/data/D2DCRC/linchao/YT/log/"
+    train_dir = "/data/D2DCRC/linchao/YT/log/"
+    code_saver_dir = "/data/D2DCRC/linchao/YT/log/"
     if self.stage == "train":
       self.phase_train = True
       data_pattern_str = "train"
@@ -154,6 +158,6 @@ class BaseConfig(object):
     # data_pattern_str = "train"
     self.data_pattern = "/data/state/linchao/YT/{0}/{1}/{1}*.tfrecord".format(
         self.input_feat_type, data_pattern_str)
-    # TODO
     if self.input_feat_type == "score":
-      self.data_pattern = "/home/linczhu/yt/scores/fusion/*.tfrecord"
+      self.data_pattern = "/data/state/linchao/YT/{0}/*.tfrecord".format(
+          self.input_feat_type, data_pattern_str)
