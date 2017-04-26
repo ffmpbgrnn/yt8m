@@ -158,6 +158,12 @@ class Expr(object):
           feature_names=self.feature_names,
           num_max_labels=self.model.num_max_labels,
           feature_sizes=self.feature_sizes,)
+    elif self.config.input_feat_type == "555":
+      reader = readers.YT8M555FeatureReader(
+          num_classes=self.model.num_classes,
+          feature_names=self.feature_names,
+          num_max_labels=self.model.num_max_labels,
+          feature_sizes=self.feature_sizes,)
     return reader
 
   def build_graph(self, inputs):
