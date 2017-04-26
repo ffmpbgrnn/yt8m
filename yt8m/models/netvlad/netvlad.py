@@ -6,13 +6,21 @@ import tensorflow.contrib.slim as slim
 
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
+from tensorflow.python.ops import tensor_array_ops
+from tensorflow.python.util import nest
 
 from yt8m.models import models
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell_impl
 import yt8m.starter.video_level_models as video_level_models
+from . import utils
 from tensorflow import logging
 
 linear = core_rnn_cell_impl._linear  # pylint: disable=protected-access
+
+from tensorflow.python.ops import rnn_cell_impl
+# pylint: disable=protected-access
+_state_size_with_prefix = rnn_cell_impl._state_size_with_prefix
+# pylint: enable=protected-access
 
 class NetVLAD(models.BaseModel):
   def __init__(self):
@@ -53,82 +61,28 @@ class NetVLAD(models.BaseModel):
   def create_model(self, model_input, vocab_size, num_frames,
                    is_training=True, sparse_labels=None, label_weights=None,
                    dense_labels=None, input_weights=None, **unused_params):
-    vlad_att_hidden_size = 100
-    C = 20
-    loss_with_vlad_kmeans = True
+    self.vlad_att_hidden_size = 100
+    self.C = 20
+    self.loss_with_vlad_kmeans = True
     self.vocab_size = vocab_size
 
     input_size = 1024+128#tf.shape(model_input)[-1]
-    fea_size = 256
+    self.fea_size = 256
 
 
     model_input = tf.reshape(model_input, [-1, self.max_steps, 1, input_size])
-    model_input = slim.conv2d(model_input, fea_size, [1, 1], activation_fn=None, scope="input_proj")
-    model_input = tf.reshape(model_input, [-1, self.max_steps, fea_size])
+    model_input = slim.conv2d(model_input, self.fea_size, [1, 1], activation_fn=None, scope="input_proj")
+    model_input = tf.reshape(model_input, [-1, self.max_steps, self.fea_size])
     input_weights = tf.tile(
         tf.expand_dims(input_weights, 2),
-        [1, 1, fea_size])
+        [1, 1, self.fea_size])
     inputs = model_input * input_weights
 
     # inputs = self.context_encoder(inputs, fea_size)
+    residual, kmeans_loss = self.query_loop(inputs)
 
-    with tf.variable_scope("centers"):
-      # TODO
-      center_reg = None # slim.l2_regularizer(1e-5)
-      center = tf.get_variable("center", shape=[1, C, 1, fea_size], dtype=tf.float32,
-                               initializer=tf.truncated_normal_initializer(stddev=0.01),
-                               regularizer=center_reg)
-    hidden = slim.conv2d(center, vlad_att_hidden_size, [1, 1], activation_fn=None, scope="hidden_conv2d")
 
-    v = tf.get_variable("attn_v", [1, 1, 1, vlad_att_hidden_size],
-                        initializer=tf.constant_initializer(0.01))
-
-    def attn(query):
-      query = tf.reshape(query, [-1, fea_size])
-      y = linear(query, vlad_att_hidden_size, True, 0.0)
-      y = tf.reshape(y, [-1, 1, 1, vlad_att_hidden_size])
-      o = tf.reduce_sum(v * tf.tanh(hidden + y), [2, 3])
-      o = tf.reshape(o, [-1, C])
-      a = tf.nn.softmax(o)
-      a = tf.reshape(a, [-1, C, 1, 1])
-      return a
-
-    l2_loss = 0
-    with tf.variable_scope("vlad"):
-      # query = tf.reshape(inputs, [-1, fea_size])
-      a = attn(inputs)
-      d = a * (center + tf.reshape(inputs, [-1, 1, 1, fea_size]))
-      if is_training and loss_with_vlad_kmeans:
-        l2_loss = tf.reduce_mean(
-            tf.reduce_sum(d * d, axis=3))
-      d = tf.reshape(d, [-1, self.max_steps, C, fea_size])
-      d = tf.reduce_sum(d, axis=1)
-    residual = d
-
-    '''
-    batch_size = tf.shape(model_input)[0]
-    with tf.variable_scope('vlad'):
-      for i in xrange(seq_length):
-        if i > 0:
-          tf.get_variable_scope().reuse_variables()
-
-        ins = tf.reshape(inputs[:, i, :], [-1, 1, 1, fea_size])
-        a = attn(ins)
-        d = a * (center + ins)
-        if is_training and loss_with_vlad_kmeans:
-          loss_ = tf.reduce_sum(d * d, [0, 1, 2, 3]) / batch_size / C
-          if i == 0:
-            total_loss_ = loss_
-          else:
-            total_loss_ += loss_
-        if residual is None:
-          residual = d
-        else:
-          residual = residual + d
-      if is_training and loss_with_vlad_kmeans:
-        total_loss_ /= seq_length
-    '''
-    outputs = self.normalization(residual, C * fea_size, ssr=True,
+    outputs = self.normalization(residual, self.C * self.fea_size, ssr=True,
                                  intra_norm=True, l2_norm=True, norm_dim=2)
     # outputs = tf.stop_gradient(outputs)
     # moe = video_level_models.MoeModel()
@@ -143,21 +97,7 @@ class NetVLAD(models.BaseModel):
     loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=labels, logits=logits)
     loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
     logits = tf.nn.sigmoid(logits)
-    loss += l2_loss * 1e-8
-    '''
-    # TODO
-    # self.variables_to_restore = slim.get_model_variables()
-    '''
-
-    # logits = self.get_final_probs(outputs)
-    '''
-    with tf.name_scope("loss_xent"):
-      epsilon = 1e-6
-      cross_entropy_loss = labels * tf.log(logits + epsilon) + (
-          1 - labels) * tf.log(1 - logits + epsilon)
-      cross_entropy_loss = tf.negative(cross_entropy_loss)
-      loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
-    '''
+    loss += kmeans_loss * 1e-8
 
     return {
         "predictions": logits,
@@ -184,83 +124,95 @@ class NetVLAD(models.BaseModel):
       outputs = tf.nn.l2_normalize(outputs, [1])
     return outputs
 
-  def get_final_probs00(self, predictions):
-    batch_norm_params = {
-        'decay': 0.9997,
-        'epsilon': 0.001,
-        'updates_collections': tf.GraphKeys.UPDATE_OPS,
-    }
-    outputs = slim.fully_connected(outputs, 1024, activation_fn=None,
-                                   weights_regularizer=slim.l2_regularizer(1e-8),
-                                   normalizer_fn=slim.batch_norm,
-                                   normalizer_params=batch_norm_params,
-                                   scope="cls_proj")
 
-  def get_final_probs0(self, predictions):
-    num_mixtures = 5
-    l2_penalty = 1e-8
-    gates = slim.fully_connected(
-        predictions,
-        num_mixtures * (self.vocab_size + 1),
-        activation_fn=None,
-        weights_regularizer=slim.l2_regularizer(l2_penalty),
-        scope="gates")
-    gate_weights = slim.fully_connected(
-        predictions,
-        num_mixtures,
-        activation_fn=None,
-        weights_regularizer=slim.l2_regularizer(l2_penalty),
-        scope="gate_weights")
-    gate_activations = tf.nn.softmax(
-        tf.reshape(gates, [-1, num_mixtures, (self.vocab_size + 1)]), dim=2)
-    # preds = gate_activations * tf.reshape(gate_weights, [-1, num_mixtures, 1])
-    preds = gate_activations
-    preds = tf.reduce_max(preds, axis=1)[:, :self.vocab_size]
-    '''
-    preds = slim.fully_connected(
-        preds,
-        self.vocab_size,
-        activation_fn=None,
-        weights_regularizer=slim.l2_regularizer(l2_penalty),
-        scope="preds")
-    '''
-    return preds
+  def query_loop(self, inputs):
+    flat_input = nest.flatten(inputs)
+    # (B,T,D) => (T,B,D)
+    flat_input = [tf.convert_to_tensor(input_) for input_ in flat_input]
+    flat_input = tuple(utils.transpose_batch_time(input_) for input_ in flat_input)
 
-  def get_final_probs(self, predictions):
-    num_mixtures = 4
-    l2_penalty = 1e-8
-    # predictions = slim.fully_connected(
-        # predictions,
-        # 1024,
-        # activation_fn=tf.nn.relu,
-        # biases_initializer=None,
-        # weights_regularizer=slim.l2_regularizer(l2_penalty),
-        # scope="input_maping")
+    with tf.variable_scope("centers"):
+      # TODO
+      center_reg = None # slim.l2_regularizer(1e-5)
+      center = tf.get_variable("center", shape=[1, self.C, 1, self.fea_size], dtype=tf.float32,
+                               initializer=tf.truncated_normal_initializer(stddev=0.01),
+                               regularizer=center_reg)
+    hidden = slim.conv2d(center, self.vlad_att_hidden_size, [1, 1], activation_fn=None,
+                         scope="hidden_conv2d")
 
-    gate_activations = slim.fully_connected(
-        predictions,
-        self.vocab_size * (num_mixtures + 1),
-        activation_fn=None,
-        biases_initializer=tf.constant_initializer(1.),
-        weights_regularizer=slim.l2_regularizer(l2_penalty),
-        scope="gates")
-    expert_activations = slim.fully_connected(
-        predictions,
-        self.vocab_size * num_mixtures,
-        activation_fn=None,
-        biases_initializer=tf.constant_initializer(1.),
-        weights_regularizer=slim.l2_regularizer(l2_penalty),
-        scope="experts")
+    v = tf.get_variable("attn_v", [1, 1, 1, self.vlad_att_hidden_size],
+                        initializer=tf.constant_initializer(0.01))
 
-    gating_distribution = tf.nn.softmax(tf.reshape(
-        gate_activations,
-        [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
-    expert_distribution = tf.nn.sigmoid(tf.reshape(
-        expert_activations,
-        [-1, num_mixtures]))  # (Batch * #Labels) x num_mixtures
+    def attn(query):
+      query = tf.reshape(query, [-1, self.fea_size])
+      y = linear(query, self.vlad_att_hidden_size, True, 0.0)
+      y = tf.reshape(y, [-1, 1, 1, self.vlad_att_hidden_size])
+      o = tf.reduce_sum(v * tf.tanh(hidden + y), [2, 3])
+      o = tf.reshape(o, [-1, self.C])
+      a = tf.nn.softmax(o)
+      a = tf.reshape(a, [-1, self.C, 1, 1])
+      return a
 
-    final_probabilities_by_class_and_batch = tf.reduce_sum(
-        gating_distribution[:, :num_mixtures] * expert_distribution, 1)
-    final_probabilities = tf.reshape(final_probabilities_by_class_and_batch,
-                                     [-1, self.vocab_size])
-    return final_probabilities
+    with tf.variable_scope("query_loop") as varscope:
+      if varscope.caching_device is None:
+        varscope.set_caching_device(lambda op: op.device)
+      input_shape = tuple(tf.shape(input_) for input_ in flat_input)
+
+      inputs = nest.pack_sequence_as(structure=inputs, flat_sequence=flat_input)
+
+      flat_input = nest.flatten(inputs)
+
+      input_shape = tf.shape(flat_input[0])
+      time_steps = input_shape[0]
+      batch_size = input_shape[1]
+
+      inputs_got_shape = tuple(input_.get_shape().with_rank_at_least(3)
+                              for input_ in flat_input)
+
+      const_time_steps, const_batch_size = inputs_got_shape[0].as_list()[:2]
+
+      time = tf.constant(0, dtype=tf.int32, name="time")
+
+      with tf.name_scope("dynamic_query") as scope:
+        base_name = scope
+
+      def _create_ta(name, dtype):
+        return tensor_array_ops.TensorArray(dtype=dtype,
+                                            size=time_steps,
+                                            tensor_array_name=base_name + name)
+
+      input_ta = tuple(_create_ta("input_%d" % i, flat_input[i].dtype)
+                      for i in range(len(flat_input)))
+
+      input_ta = tuple(ta.unstack(input_)
+                      for ta, input_ in zip(input_ta, flat_input))
+
+      def _time_step(time, kmeans_loss, residual):
+        input_t = tuple(ta.read(time) for ta in input_ta)
+        for input_, shape in zip(input_t, inputs_got_shape):
+          input_.set_shape(shape[1:])
+
+        input_t = nest.pack_sequence_as(structure=inputs, flat_sequence=input_t)
+        input_t = tf.reshape(input_t, [-1, 1, 1, self.fea_size])
+        a = attn(input_t)
+        d = a * (center + input_t)
+        l = tf.reduce_sum(d * d) / tf.cast(batch_size, dtype=tf.float32) / self.C
+        kmeans_loss += l
+        residual = residual + d
+
+        return (time + 1, kmeans_loss, residual)
+
+      kmeans_loss = tf.constant(0., dtype=tf.float32)
+      residual = tf.zeros([batch_size, self.C, 1, self.fea_size], dtype=tf.float32)
+      parallel_iterations = 32
+      swap_memory = False
+      _, kmeans_loss, residual= tf.while_loop(
+          cond=lambda time, *_: time < time_steps,
+          body=_time_step,
+          loop_vars=(time, kmeans_loss, residual),
+          parallel_iterations=parallel_iterations,
+          swap_memory=swap_memory)
+
+      kmeans_loss /= tf.cast(time_steps, dtype=tf.float32)
+
+      return (residual, kmeans_loss)
