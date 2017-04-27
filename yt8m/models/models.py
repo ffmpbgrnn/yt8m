@@ -26,6 +26,7 @@ class BaseModel(object):
     self.base_learning_rate = 1e-2
     self.num_max_labels = -1
     self.num_classes = 4716
+    self.decay_lr = False
 
   def create_model(self, unused_model_input, **unused_params):
     raise NotImplementedError()

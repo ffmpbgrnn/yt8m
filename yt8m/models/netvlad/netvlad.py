@@ -29,7 +29,7 @@ class NetVLAD(models.BaseModel):
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 4e-3 # 4e-3, 3e-4
+    self.base_learning_rate = 5e-3 # 4e-3 # 4e-3, 3e-4
     self.max_steps = 300
 
 
@@ -73,13 +73,14 @@ class NetVLAD(models.BaseModel):
     model_input = tf.reshape(model_input, [-1, self.max_steps, 1, input_size])
     model_input = slim.conv2d(model_input, self.fea_size, [1, 1], activation_fn=None, scope="input_proj")
     model_input = tf.reshape(model_input, [-1, self.max_steps, self.fea_size])
-    input_weights = tf.tile(
-        tf.expand_dims(input_weights, 2),
-        [1, 1, self.fea_size])
-    inputs = model_input * input_weights
+    # input_weights = tf.tile(
+        # tf.expand_dims(input_weights, 2),
+        # [1, 1, self.fea_size])
+    inputs = model_input #* input_weights
 
     # inputs = self.context_encoder(inputs, fea_size)
     residual, kmeans_loss = self.query_loop(inputs)
+    residual = tf.reshape(residual, [-1, self.C, self.fea_size])
 
 
     outputs = self.normalization(residual, self.C * self.fea_size, ssr=True,
@@ -133,7 +134,7 @@ class NetVLAD(models.BaseModel):
 
     with tf.variable_scope("centers"):
       # TODO
-      center_reg = None # slim.l2_regularizer(1e-5)
+      center_reg = slim.l2_regularizer(1e-5)# None #
       center = tf.get_variable("center", shape=[1, self.C, 1, self.fea_size], dtype=tf.float32,
                                initializer=tf.truncated_normal_initializer(stddev=0.01),
                                regularizer=center_reg)
@@ -205,7 +206,7 @@ class NetVLAD(models.BaseModel):
       kmeans_loss = tf.constant(0., dtype=tf.float32)
       residual = tf.zeros([batch_size, self.C, 1, self.fea_size], dtype=tf.float32)
       parallel_iterations = 32
-      swap_memory = False
+      swap_memory = True
       _, kmeans_loss, residual= tf.while_loop(
           cond=lambda time, *_: time < time_steps,
           body=_time_step,

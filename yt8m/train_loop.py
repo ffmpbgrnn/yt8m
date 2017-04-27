@@ -121,15 +121,16 @@ def get_train_op(self, result, label_loss):
         momentum=0.9,
         epsilon=1)
   else:
-    learning_rate = tf.train.exponential_decay(
-        self.model.base_learning_rate,
-        self.global_step * self.batch_size,
-        4000000,
-        0.95,
-        staircase=True
-    )
-    # TODO
-    learning_rate = self.model.base_learning_rate
+    if self.model.decay_lr:
+      learning_rate = tf.train.exponential_decay(
+          self.model.base_learning_rate,
+          self.global_step * self.batch_size,
+          4000000,
+          0.95,
+          staircase=True
+      )
+    else:
+      learning_rate = self.model.base_learning_rate
     tf.summary.scalar('learning_rate', learning_rate)
     opt = self.optimizer(learning_rate)
   for variable in slim.get_model_variables():

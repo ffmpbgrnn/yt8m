@@ -60,9 +60,10 @@ class BaseConfig(object):
     # self.input_feat_type = "video"
     # self.use_hdfs = False
 
-    # self.model_name = "NetVLAD"
-    # self.input_feat_type = "frame"
-    # self.use_hdfs = False
+    self.model_name = "NetVLAD"
+    self.input_feat_type = "frame"
+    self.use_hdfs = False
+    self.batch_size = 512
 
     # self.model_name = "Dilation"
     # self.input_feat_type = "frame"
@@ -87,12 +88,16 @@ class BaseConfig(object):
     # self.model_name = "HLSTMEncoder"
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
-    # self.batch_size = 128
+    # self.batch_size = 512
 
-    self.model_name = "FusionModel"
-    self.input_feat_type = "score"
-    self.use_hdfs = False
+    # self.model_name = "FusionModel"
+    # self.input_feat_type = "score"
+    # self.use_hdfs = False
 
+    # self.model_name = "MoeModel"
+    # self.input_feat_type = "555"
+    # self.use_hdfs = False
+    # self.batch_size = 512
 
     if self.input_feat_type == "frame":
       self.feature_names = "rgb, audio"
@@ -160,4 +165,7 @@ class BaseConfig(object):
         self.input_feat_type, data_pattern_str)
     if self.input_feat_type == "score":
       self.data_pattern = "/data/state/linchao/YT/{0}/*.tfrecord".format(
+          self.input_feat_type, data_pattern_str)
+    elif self.input_feat_type == "555":
+      self.data_pattern = "/data/state/linchao/YT/555_netvlad/{1}/*.tfrecord".format(
           self.input_feat_type, data_pattern_str)
