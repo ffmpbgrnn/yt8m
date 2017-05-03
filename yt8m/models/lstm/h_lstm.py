@@ -33,7 +33,7 @@ class HLSTMEncoder(models.BaseModel):
   def __init__(self):
     super(HLSTMEncoder, self).__init__()
 
-    self.normalize_input = False
+    self.normalize_input = True # TODO
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"

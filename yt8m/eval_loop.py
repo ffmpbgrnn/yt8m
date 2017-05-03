@@ -152,14 +152,14 @@ def evaluation_loop(self, saver, model_ckpt_path):
       logging.info(
           "Done with batched inference. Now calculating global performance "
           "metrics.")
-      # calculate the metrics for the entire epoch
-      epoch_info_dict = evl_metrics.get()
-      epoch_info_dict["epoch_id"] = global_step_val
       if output_scores == 1:
         pred_out.close()
         pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
       elif output_scores == 2:
         tfrecord_writer.close()
+      # calculate the metrics for the entire epoch
+      epoch_info_dict = evl_metrics.get()
+      epoch_info_dict["epoch_id"] = global_step_val
 
       if summary_writer:
         summary_writer.add_summary(res["summary"], global_step_val)
