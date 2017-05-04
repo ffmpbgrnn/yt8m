@@ -44,6 +44,7 @@ class BaseConfig(object):
         "PruneCls",
         "HLSTMEncoder",
         "FusionModel",
+        "HGRU3Encoder"
     ]
     self.label_smoothing = False
     self.batch_size = None
@@ -94,8 +95,13 @@ class BaseConfig(object):
     # self.input_feat_type = "score"
     # self.use_hdfs = False
 
-    self.model_name = "MoeModel"
-    self.input_feat_type = "555"
+    # self.model_name = "MoeModel"
+    # self.input_feat_type = "555"
+    # self.use_hdfs = False
+    # self.batch_size = 512
+
+    self.model_name = "HGRU3Encoder"
+    self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512
 
