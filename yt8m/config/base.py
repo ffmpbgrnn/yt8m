@@ -44,7 +44,8 @@ class BaseConfig(object):
         "PruneCls",
         "HLSTMEncoder",
         "FusionModel",
-        "HGRU3Encoder"
+        "HGRU3Encoder",
+        "LNHGRUncoder",
     ]
     self.label_smoothing = False
     self.batch_size = None
@@ -100,7 +101,17 @@ class BaseConfig(object):
     # self.use_hdfs = False
     # self.batch_size = 512
 
-    self.model_name = "HGRU3Encoder"
+    # self.model_name = "HGRU3Encoder"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 512
+
+    # self.model_name = "GRUAttn"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 512
+
+    self.model_name = "LNHGRUncoder"
     self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512

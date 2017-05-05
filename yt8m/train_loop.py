@@ -127,7 +127,7 @@ def get_train_op(self, result, label_loss):
           self.global_step * self.batch_size,
           4000000,
           0.95,
-          staircase=True
+          staircase=False
       )
     else:
       learning_rate = self.model.base_learning_rate
