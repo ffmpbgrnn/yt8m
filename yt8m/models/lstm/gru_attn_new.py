@@ -93,8 +93,66 @@ class GRUAttn(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 3e-4
 
-  def create_model(self, model_input, vocab_size, num_frames,
+
+  def two_layers(self, model_input, vocab_size, num_frames,
+                 is_training=True, dense_labels=None, **unused_params):
+    print("RUNNING TWO LAYERS")
+    def get_enc_cell(cell_size, vocab_size):
+      # cell = cudnn_rnn_ops.CudnnGRU(1, cell_size, (1024+128))
+      cell = gru_ops.GRUBlockCell(cell_size)
+      return cell
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+
+    # dec_cell = self.get_dec_cell(self.cell_size)
+    runtime_batch_size = tf.shape(model_input)[0]
+
+    with tf.variable_scope("EncLayer0"):
+      first_enc_cell = get_enc_cell(self.cell_size, vocab_size) # TODO
+      enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
+      num_splits = 15
+      model_input_splits = tf.split(model_input, num_or_size_splits=num_splits, axis=1)
+      enc_state = None
+      first_layer_outputs = []
+      for i in xrange(num_splits):
+        if i == 0:
+          initial_state = enc_init_state
+        else:
+          initial_state = enc_state
+          tf.get_variable_scope().reuse_variables()
+        initial_state = tf.stop_gradient(initial_state)
+        enc_outputs, enc_state = tf.nn.dynamic_rnn(
+            first_enc_cell, model_input_splits[i], initial_state=initial_state, scope="enc0")
+        # TODO
+        enc_state = moe_layer(enc_state, 1024, 2, act_func=None, l2_penalty=1e-12)
+        if is_training:
+          enc_state = tf.nn.dropout(enc_state, 0.8)
+        first_layer_outputs.append(enc_state)
+
+    with tf.variable_scope("EncLayer1"):
+      second_enc_cell = get_enc_cell(self.cell_size, vocab_size)
+      enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
+      first_layer_outputs = tf.stack(first_layer_outputs, axis=1)
+      enc_outputs, enc_state = tf.nn.dynamic_rnn(
+          second_enc_cell, first_layer_outputs, initial_state=enc_init_state, scope="enc1")
+    flatten_outputs = attn_new.attn(enc_outputs, fea_size=1024, seq_len=num_splits)
+    # TODO
+    if is_training:
+      flatten_outputs = tf.nn.dropout(flatten_outputs, 0.8)
+    logits = moe_layer(flatten_outputs, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    return {"predictions": logits}
+
+  def three_layers(self, model_input, vocab_size, num_frames,
                    is_training=True, dense_labels=None, **unused_params):
+    def get_enc_cell0(self, cell_size):
+      cell = gru_ops.GRUBlockCell(cell_size)
+      return cell
+
+    def get_enc_cell1(self, cell_size):
+      cell = gru_ops.GRUBlockCell(cell_size)
+      cell = core_rnn_cell.OutputProjectionWrapper(cell, 1024)
+      return cell
+
     self.is_training = is_training
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
 
@@ -114,8 +172,8 @@ class GRUAttn(models.BaseModel):
       with tf.variable_scope("enc1"):
         # TODO
         second_inputs = moe_layer_3d(second_inputs, self.cell_size, 2, act_func=None,
-                                     seq_len=30, input_size=self.cell_size, l2_penalty=1e-8)
-        enc_cell1 = self.get_enc_cell1(self.cell_size,)
+                                     seq_len=30, input_size=self.cell_size, l2_penalty=1e-12)
+        enc_cell1 = get_enc_cell1(self.cell_size,)
         enc_outputs, enc_state = tf.nn.dynamic_rnn(
             enc_cell1, second_inputs, initial_state=initial_state, scope="enc1")
 
@@ -124,18 +182,15 @@ class GRUAttn(models.BaseModel):
     if self.is_training:
       flatten_outputs = tf.nn.dropout(flatten_outputs, 0.5)
     logits = moe_layer(flatten_outputs, vocab_size, 2,
-                       act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+                       act_func=tf.nn.sigmoid, l2_penalty=1e-12)
 
     return {"predictions": logits}
 
-  def get_enc_cell0(self, cell_size):
-    cell = gru_ops.GRUBlockCell(cell_size)
-    return cell
-
-  def get_enc_cell1(self, cell_size):
-    cell = gru_ops.GRUBlockCell(cell_size)
-    cell = core_rnn_cell.OutputProjectionWrapper(cell, 1024)
-    return cell
+  def create_model(self, model_input, vocab_size, num_frames,
+                   is_training=True, dense_labels=None, **unused_params):
+    res = self.two_layers(model_input, vocab_size, num_frames,
+                    is_training=is_training, dense_labels=dense_labels)
+    return res
 
   '''
     cells = []
