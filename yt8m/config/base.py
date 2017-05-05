@@ -111,7 +111,12 @@ class BaseConfig(object):
     # self.use_hdfs = False
     # self.batch_size = 512
 
-    self.model_name = "LNHGRUncoder"
+    # self.model_name = "LNHGRUncoder"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 256
+
+    self.model_name = "BiHLSTMEncoder"
     self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512
