@@ -46,6 +46,7 @@ class BaseConfig(object):
         "FusionModel",
         "HGRU3Encoder",
         "LNHGRUncoder",
+        "BiHLSTMEncoderNew",
     ]
     self.label_smoothing = False
     self.batch_size = None
@@ -116,7 +117,12 @@ class BaseConfig(object):
     # self.use_hdfs = False
     # self.batch_size = 256
 
-    self.model_name = "BiHLSTMEncoder"
+    # self.model_name = "BiHLSTMEncoder"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 512
+
+    self.model_name = "BiHLSTMEncoderNew"
     self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512
