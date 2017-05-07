@@ -47,6 +47,7 @@ class BaseConfig(object):
         "HGRU3Encoder",
         "LNHGRUncoder",
         "BiHLSTMEncoderNew",
+        "DilationModel",
     ]
     self.label_smoothing = False
     self.batch_size = None
@@ -123,6 +124,11 @@ class BaseConfig(object):
     # self.batch_size = 512
 
     self.model_name = "BiHLSTMEncoderNew"
+    self.input_feat_type = "frame"
+    self.use_hdfs = False
+    self.batch_size = 256 # TODO
+
+    self.model_name = "DilationModel"
     self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512
