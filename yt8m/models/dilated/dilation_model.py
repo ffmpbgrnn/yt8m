@@ -70,7 +70,7 @@ class DilationModel(models.BaseModel):
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 1e-2
+    self.base_learning_rate = 1e-3
 
     self.cell_size = 1024
     self.max_steps = 300
@@ -129,8 +129,8 @@ class DilationModel(models.BaseModel):
     with tf.variable_scope("logit"):
       logit = slim.conv2d(skip, num_dim, [1, 1], activation_fn=tf.nn.tanh,
                           normalizer_fn=normalizer_fn, normalizer_params=batch_norm_params,
-                          name='conv_1',)
-      logit = slim.reduce_mean(logit, axis=[1, 2])
+                          scope='conv_1')
+      logit = tf.reduce_mean(logit, axis=[1, 2])
                 # .sg_conv1d(size=1, act='tanh', bn=True, name='conv_1')
                 # .sg_conv1d(size=1, dim=voca_size, name='conv_2'))
 

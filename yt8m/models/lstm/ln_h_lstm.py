@@ -89,10 +89,12 @@ class LNHGRUncoder(models.BaseModel):
     return {"predictions": logits}
 
   def get_enc_cell(self, cell_size, vocab_size):
-    uniform_init_scale = 0.1
-    uniform_initializer = tf.random_uniform_initializer(
-        minval=-uniform_init_scale,
-        maxval=uniform_init_scale)
+    from tensorflow.contrib.layers.python.layers import initializers
+    uniform_initializer = initializers.xavier_initializer()
+    # uniform_init_scale = 0.01
+    # uniform_initializer = tf.random_uniform_initializer(
+        # minval=-uniform_init_scale,
+        # maxval=uniform_init_scale)
 
     def random_orthonormal_initializer(shape, dtype=tf.float32,
                                       partition_info=None):  # pylint: disable=unused-argument
