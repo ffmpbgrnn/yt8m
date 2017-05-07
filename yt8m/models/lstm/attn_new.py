@@ -3,8 +3,7 @@ import tensorflow as tf
 
 slim = tf.contrib.slim
 
-def attn(hidden_states, fea_size, seq_len=300):
-  num_heads = 5
+def attn(hidden_states, fea_size, num_heads=5, seq_len=300):
   hidden_size = 100
   # hidden: batch_size x seq_len x fea_size
   batch_size = tf.shape(hidden_states)[0]

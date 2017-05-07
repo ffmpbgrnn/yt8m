@@ -93,6 +93,56 @@ class GRUAttn(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 3e-4
 
+  def two_attn_layers(self, model_input, vocab_size, num_frames,
+                 is_training=True, dense_labels=None, **unused_params):
+    print("RUNNING TWO ATTN LAYERS")
+    def get_enc_cell(cell_size, vocab_size):
+      # cell = cudnn_rnn_ops.CudnnGRU(1, cell_size, (1024+128))
+      cell = gru_ops.GRUBlockCell(cell_size)
+      return cell
+
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
+
+    # dec_cell = self.get_dec_cell(self.cell_size)
+    runtime_batch_size = tf.shape(model_input)[0]
+
+    with tf.variable_scope("EncLayer0"):
+      first_enc_cell = get_enc_cell(self.cell_size, vocab_size) # TODO
+      enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
+      num_splits = 15
+      model_input_splits = tf.split(model_input, num_or_size_splits=num_splits, axis=1)
+      enc_state = None
+      first_layer_outputs = []
+      for i in xrange(num_splits):
+        if i == 0:
+          initial_state = enc_init_state
+        else:
+          initial_state = enc_state
+          tf.get_variable_scope().reuse_variables()
+        initial_state = tf.stop_gradient(initial_state)
+        enc_outputs, enc_state = tf.nn.dynamic_rnn(
+            first_enc_cell, model_input_splits[i], initial_state=initial_state, scope="enc0")
+        # TODO
+        with tf.variable_scope("Attn"):
+          enc_outputs = attn_new.attn(enc_outputs, fea_size=1024, num_heads=1, seq_len=num_splits)
+        if is_training:
+          enc_state = tf.nn.dropout(enc_state, 0.5)
+        enc_state = moe_layer(enc_state, 1024, 4, act_func=None, l2_penalty=1e-12)
+        first_layer_outputs.append(enc_state)
+
+    with tf.variable_scope("EncLayer1"):
+      second_enc_cell = get_enc_cell(self.cell_size, vocab_size)
+      enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
+      first_layer_outputs = tf.stack(first_layer_outputs, axis=1)
+      enc_outputs, enc_state = tf.nn.dynamic_rnn(
+          second_enc_cell, first_layer_outputs, initial_state=enc_init_state, scope="enc1")
+    with tf.variable_scope("Attn"):
+      flatten_outputs = attn_new.attn(enc_outputs, fea_size=1024, num_heads=1, seq_len=num_splits)
+    # TODO
+    if is_training:
+      flatten_outputs = tf.nn.dropout(flatten_outputs, 0.8)
+    logits = moe_layer(flatten_outputs, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    return {"predictions": logits}
 
   def two_layers(self, model_input, vocab_size, num_frames,
                  is_training=True, dense_labels=None, **unused_params):
