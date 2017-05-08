@@ -1,16 +1,50 @@
 import tensorflow as tf
+from yt8m.models import models
 from . import utils
 
-def one_layer(self, inputs):
-  return tf.tanh(
-      utils.conv_linear(inputs, 1, 1, self.nmaps, "input"))
+slim = tf.contrib.slim
 
-class ConvGRU(object):
+def moe_layer(model_input, hidden_size, num_mixtures,
+                act_func=None, l2_penalty=None):
+  gate_activations = slim.fully_connected(
+      model_input,
+      hidden_size * (num_mixtures + 1),
+      activation_fn=None,
+      biases_initializer=None,
+      weights_regularizer=slim.l2_regularizer(l2_penalty),
+      scope="gates")
+  expert_activations = slim.fully_connected(
+      model_input,
+      hidden_size * num_mixtures,
+      activation_fn=None,
+      weights_regularizer=slim.l2_regularizer(l2_penalty),
+      scope="experts")
+
+  expert_act_func = act_func
+  gating_distribution = tf.nn.softmax(tf.reshape(
+      gate_activations,
+      [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
+  expert_distribution = tf.reshape(
+      expert_activations,
+      [-1, num_mixtures])  # (Batch * #Labels) x num_mixtures
+  if expert_act_func is not None:
+    expert_distribution = expert_act_func(expert_distribution)
+
+  outputs = tf.reduce_sum(
+      gating_distribution[:, :num_mixtures] * expert_distribution, 1)
+  outputs = tf.reshape(outputs, [-1, hidden_size])
+  return outputs
+
+class ConvGRU(models.BaseModel):
   def __init__(self):
+    super(ConvGRU, self).__init__()
     # self.height = 3
     # self.vec_size = 1536
-    self.max_grad_norm = 5.
-    self.lr = 3e-4
+    self.normalize_input = True
+    self.clip_global_norm = 5
+    self.var_moving_average_decay = 0.9997
+    self.optimizer_name = "AdamOptimizer"
+    self.base_learning_rate = 3e-4
 
     self.rx_step = 6
     self.dropout_ratio = 0.2
@@ -24,7 +58,6 @@ class ConvGRU(object):
     self.output_layer_type = 1
     self.dropout_keep_prob = 1.0 - self.dropout_ratio * 8.0 / self.length
 
-    self.noclass = 4716
     self.num_out_length = 300
 
   def create_model(self, model_input, vocab_size, num_frames,
@@ -33,7 +66,8 @@ class ConvGRU(object):
     self.mask
     self.run_time_batch_size = tf.shape(model_input)[0]
     with tf.variable_scope("Frames"):
-      frame_layer_input = self.one_layer(model_input)
+      frame_layer_input = tf.tanh(
+          utils.conv_linear(model_input, 1, 1, self.nmaps, "input"))
     self.last_layer = self.construct_all_layers(frame_layer_input, self.mask)
 
     logits = tf.reduce_mean(self.last_layer, [2], keep_dims=True)
@@ -41,16 +75,9 @@ class ConvGRU(object):
     logits = tf.nn.relu(logits)
     logits = tf.reduce_max(logits, [1], keep_dims=True)
 
-    # layer_output = utils.conv_linear(logits, 1, 1, self.noclass, "output0")
-    output_no_softmax = tf.squeeze(logits, [1, 2])
-    xent = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=output_no_softmax, labels=self.targets)
-    perp_loss = tf.reduce_mean(xent)
-
-    self.probs = utils.softmax(output_no_softmax)
-    metric_predictions = tf.argmax(output_no_softmax, 1)
-    metric_labels = tf.squeeze(self.targets)
-
-    total_loss = perp_loss
+    logits = tf.squeeze(logits, [1, 2])
+    logits = moe_layer(logits, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    return {"predictions": logits}
 
   def construct_all_layers(self, first0, mask):
     # self.output_layers = tf.to_int32(tf.reduce_sum(mask, [1, 2, 3]))
