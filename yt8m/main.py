@@ -17,6 +17,7 @@ from yt8m.models.lstm import ln_h_lstm
 from yt8m.models.lstm import bi_h_lstm
 from yt8m.models.lstm import bi_h_lstm_new
 from yt8m.models.lstm import h_lstm
+from yt8m.models.lstm import stack_gru
 from yt8m.models.fusion import fusion
 from yt8m.models.label_bias import binary_cls
 from yt8m.models.noisy_label import noisy_label
@@ -65,7 +66,7 @@ class Expr(object):
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
          lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls,
          h_lstm, fusion, h3gru, gru_attn_new, ln_h_lstm, bi_h_lstm, bi_h_lstm_new,
-         dilation_model, convGRU, randomseq])()
+         dilation_model, convGRU, randomseq, stack_gru])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(

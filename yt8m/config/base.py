@@ -50,6 +50,7 @@ class BaseConfig(object):
         "DilationModel",
         "ConvGRU",
         "RandomSequence",
+        "StackGRUEncoder",
     ]
     self.label_smoothing = False
     self.batch_size = None
@@ -125,7 +126,12 @@ class BaseConfig(object):
     # self.use_hdfs = False
     # self.batch_size = 64 # TODO
 
-    self.model_name = "RandomSequence"
+    # self.model_name = "RandomSequence"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 512
+
+    self.model_name = "StackGRUEncoder"
     self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512
