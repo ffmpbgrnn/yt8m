@@ -44,7 +44,7 @@ class ConvGRU(models.BaseModel):
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
-    self.base_learning_rate = 3e-4
+    self.base_learning_rate = 5e-4
 
     self.rx_step = 6
     self.dropout_ratio = 0.2
@@ -84,6 +84,7 @@ class ConvGRU(models.BaseModel):
 
     logits = tf.squeeze(logits, [1, 2])
     logits = moe_layer(logits, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    logits = tf.clip_by_value(logits, 0., 1.)
     return {"predictions": logits}
 
   def construct_all_layers(self, first0, mask):
