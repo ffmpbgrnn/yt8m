@@ -28,6 +28,23 @@ def SampleRandomFrames(model_input, num_frames, num_samples):
   index = tf.stack([batch_index, frame_index], 2)
   return tf.gather_nd(model_input, index)
 
+def SampleRandomSequence(model_input, num_frames, num_samples):
+  batch_size = tf.shape(model_input)[0]
+  frame_index_offset = tf.tile(
+      tf.expand_dims(tf.range(num_samples), 0), [batch_size, 1])
+  max_start_frame_index = tf.maximum(num_frames - num_samples, 0)
+  start_frame_index = tf.cast(
+      tf.multiply(
+          tf.random_uniform([batch_size, 1]),
+          tf.cast(max_start_frame_index + 1, tf.float32)), tf.int32)
+  frame_index = tf.minimum(start_frame_index + frame_index_offset,
+                           tf.cast(num_frames - 1, tf.int32))
+  batch_index = tf.tile(
+      tf.expand_dims(tf.range(batch_size), 1), [1, num_samples])
+  index = tf.stack([batch_index, frame_index], 2)
+  return tf.gather_nd(model_input, index)
+
+
 def moe_layer(model_input, hidden_size, num_mixtures,
                 act_func=None, l2_penalty=None):
   gate_activations = slim.fully_connected(
@@ -79,7 +96,7 @@ class RandomSequence(models.BaseModel):
     with tf.variable_scope("EncLayer0"):
       cell = gru_ops.GRUBlockCell(1024)
       for i in xrange(num_splits):
-        frames = SampleRandomFrames(model_input, num_frames, 30)
+        frames = SampleRandomSequence(model_input, num_frames, 30)
         if i > 0:
           tf.get_variable_scope().reuse_variables()
         enc_outputs, enc_state = tf.nn.dynamic_rnn(
