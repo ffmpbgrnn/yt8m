@@ -90,6 +90,7 @@ class RandomSequence(models.BaseModel):
                    is_training=True, dense_labels=None, **unused_params):
     # output_ranges = 9 + tf.range(0, 300, 10)
     # second_inputs = sample_sequence(model_input, output_ranges, 20)
+    num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
 
     first_layer_outputs = []
     num_splits = 15
