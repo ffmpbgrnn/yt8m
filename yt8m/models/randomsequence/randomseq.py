@@ -104,5 +104,5 @@ class RandomSequence(models.BaseModel):
       flatten_outputs = tf.nn.dropout(flatten_outputs, 0.5)
     with tf.variable_scope("FC1"):
       logits = moe_layer(flatten_outputs, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
-
+    logits = tf.clip_by_value(logits, 0., 1.)
     return {"predictions": logits}
