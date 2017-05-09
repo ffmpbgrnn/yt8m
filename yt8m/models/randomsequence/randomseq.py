@@ -100,7 +100,7 @@ class RandomSequence(models.BaseModel):
         if i > 0:
           tf.get_variable_scope().reuse_variables()
         enc_outputs, enc_state = tf.nn.dynamic_rnn(
-            cell, frames, scope="enc0")
+            cell, frames, dtype=tf.float32, scope="enc0")
         enc_state = moe_layer(enc_state, 1024, 4, act_func=None, l2_penalty=1e-12)
         if is_training:
           enc_state = tf.nn.dropout(enc_state, 0.5)
@@ -110,7 +110,7 @@ class RandomSequence(models.BaseModel):
       cell = gru_ops.GRUBlockCell(1024)
       first_layer_outputs = tf.stack(first_layer_outputs, axis=1)
       enc_outputs, enc_state = tf.nn.dynamic_rnn(
-          cell, first_layer_outputs, scope="enc1")
+          cell, first_layer_outputs, dtype=tf.float32, scope="enc1")
 
     # flatten_outputs = attn_new.attn(enc_outputs, fea_size=1024, seq_len=num_splits)
     flatten_outputs = tf.reduce_mean(enc_outputs, axis=1)
