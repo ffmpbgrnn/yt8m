@@ -61,16 +61,23 @@ class ConvGRU(models.BaseModel):
     self.num_out_length = 300
 
   def create_model(self, model_input, vocab_size, num_frames,
-                   is_training=True, dense_labels=None, **unused_params):
+                   is_training=True, input_weights=None, dense_labels=None, **unused_params):
     self.phase_train = is_training
-    self.mask
+    self.mask = input_weights
+    self.mask = tf.reshape(self.mask, [-1, 3, 100])
+    self.mask = tf.transpose(self.mask, perm=[0, 2, 1])
+    self.mask = tf.reduce_max(self.mask, axis=2)
+
     self.run_time_batch_size = tf.shape(model_input)[0]
+    model_input = tf.reshape(model_input, [-1, 3, 100, 1024 + 128])
+    model_input = tf.transpose(model_input, perm=[0, 2, 1, 3])
     with tf.variable_scope("Frames"):
       frame_layer_input = tf.tanh(
           utils.conv_linear(model_input, 1, 1, self.nmaps, "input"))
     self.last_layer = self.construct_all_layers(frame_layer_input, self.mask)
 
     logits = tf.reduce_mean(self.last_layer, [2], keep_dims=True)
+    logits = logits * tf.cast(tf.reshape(self.mask, [-1, 100, 1, 1]), tf.float32)
     logits = utils.conv_linear(logits, 1, 1, self.nmaps, "output0")
     logits = tf.nn.relu(logits)
     logits = tf.reduce_max(logits, [1], keep_dims=True)
