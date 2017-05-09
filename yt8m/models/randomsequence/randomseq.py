@@ -93,11 +93,11 @@ class RandomSequence(models.BaseModel):
     num_frames = tf.cast(tf.expand_dims(num_frames, 1), tf.float32)
 
     first_layer_outputs = []
-    num_splits = 15
+    num_splits = 6
     with tf.variable_scope("EncLayer0"):
       cell = gru_ops.GRUBlockCell(1024)
       for i in xrange(num_splits):
-        frames = SampleRandomSequence(model_input, num_frames, 30)
+        frames = SampleRandomSequence(model_input, num_frames, 50)
         if i > 0:
           tf.get_variable_scope().reuse_variables()
         enc_outputs, enc_state = tf.nn.dynamic_rnn(
@@ -117,7 +117,13 @@ class RandomSequence(models.BaseModel):
     flatten_outputs = tf.reduce_mean(enc_outputs, axis=1)
 
     with tf.variable_scope("FC0"):
-      flatten_outputs = moe_layer(flatten_outputs, 1024, 2, act_func=tf.nn.relu, l2_penalty=1e-8)
+      flatten_outputs = slim.fully_connected(
+          flatten_outputs,
+          1024,
+          activation_fn=tf.nn.relu,
+          weights_regularizer=slim.l2_regularizer(1e-8),
+          scope="fc0")
+      # flatten_outputs = moe_layer(flatten_outputs, 1024, 2, act_func=tf.nn.relu, l2_penalty=1e-8)
     if is_training:
       flatten_outputs = tf.nn.dropout(flatten_outputs, 0.5)
     with tf.variable_scope("FC1"):
