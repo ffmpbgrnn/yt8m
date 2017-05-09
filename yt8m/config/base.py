@@ -49,6 +49,7 @@ class BaseConfig(object):
         "BiHLSTMEncoderNew",
         "DilationModel",
         "ConvGRU",
+        "RandomSequence",
     ]
     self.label_smoothing = False
     self.batch_size = None
@@ -119,10 +120,15 @@ class BaseConfig(object):
     # self.use_hdfs = False
     # self.batch_size = 256
 
-    self.model_name = "ConvGRU"
+    # self.model_name = "ConvGRU"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 64 # TODO
+
+    self.model_name = "RandomSequence"
     self.input_feat_type = "frame"
     self.use_hdfs = False
-    self.batch_size = 256
+    self.batch_size = 512
 
     # self.model_name = "BiHLSTMEncoder"
     # self.input_feat_type = "frame"

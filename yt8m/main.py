@@ -24,6 +24,7 @@ from yt8m.models.vlad import prune_cls
 from yt8m.models.dilated import dilation
 from yt8m.models.dilated import dilation_model
 from yt8m.models.convgru import convGRU
+from yt8m.models.randomsequence import randomseq
 from yt8m.models.netvlad import netvlad
 from yt8m.data_io import readers
 from yt8m.data_io import vlad_reader
@@ -64,7 +65,7 @@ class Expr(object):
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
          lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls,
          h_lstm, fusion, h3gru, gru_attn_new, ln_h_lstm, bi_h_lstm, bi_h_lstm_new,
-         dilation_model, convGRU])()
+         dilation_model, convGRU, randomseq])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(

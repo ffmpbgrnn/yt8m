@@ -95,8 +95,14 @@ class RandomSequence(models.BaseModel):
       enc_outputs, enc_state = tf.nn.dynamic_rnn(
           cell, first_layer_outputs, scope="enc1")
 
-    flatten_outputs = attn_new.attn(enc_outputs, fea_size=1024, seq_len=num_splits)
+    # flatten_outputs = attn_new.attn(enc_outputs, fea_size=1024, seq_len=num_splits)
+    flatten_outputs = tf.reduce_mean(enc_outputs, axis=1)
+
+    with tf.variable_scope("FC0"):
+      flatten_outputs = moe_layer(flatten_outputs, 1024, 2, act_func=tf.nn.relu, l2_penalty=1e-8)
     if is_training:
-      flatten_outputs = tf.nn.dropout(flatten_outputs, 0.8)
-    logits = moe_layer(flatten_outputs, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+      flatten_outputs = tf.nn.dropout(flatten_outputs, 0.5)
+    with tf.variable_scope("FC1"):
+      logits = moe_layer(flatten_outputs, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+
     return {"predictions": logits}
