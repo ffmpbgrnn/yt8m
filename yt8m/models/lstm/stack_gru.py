@@ -88,15 +88,18 @@ class StackGRUEncoder(models.BaseModel):
         # first_layer_outputs.append(enc_state)
 
     # TODO
+    enc_state = enc_state[:, 0:1024]
     if is_training:
       enc_state = tf.nn.dropout(enc_state, 0.8)
     logits = moe_layer(enc_state, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    logits = tf.clip_by_value(logits, 0., 1.)
     return {"predictions": logits}
 
   def get_enc_cell(self, cell_size, vocab_size):
     # cell = cudnn_rnn_ops.CudnnGRU(1, cell_size, (1024+128))
     cells = []
     cell = gru_ops.GRUBlockCell(cell_size)
+    cell = core_rnn_cell.OutputProjectionWrapper(cell, cell_size)
     cell = tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=0.5)
     cells.append(cell)
 
