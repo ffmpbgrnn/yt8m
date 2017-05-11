@@ -1,6 +1,11 @@
 import tensorflow as tf
 from yt8m.models import models
 from tensorflow.contrib.rnn.python.ops import gru_ops
+from tensorflow.contrib.rnn.python.ops import core_rnn_cell
+from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
+from tensorflow.python.layers.core import Dense
+
+import attn
 
 slim = tf.contrib.slim
 
@@ -93,6 +98,22 @@ def moe_layer(model_input, hidden_size, num_mixtures,
   outputs = tf.reshape(outputs, [-1, hidden_size])
   return outputs
 
+
+def reconstruct_loss(logit, target):
+  # Huber loss
+  sigma = 2.
+  delta = sigma * sigma
+  d = logit - target
+  if True:
+    a = .5 * delta * d * d
+    b = tf.abs(d) - 0.5 / delta
+    l = tf.where(tf.abs(d) < (1. / delta), a, b)
+  else:
+    l = .5 * d * d
+  # loss = tf.reduce_sum(d * d, reduction_indices=1)
+  loss = tf.reduce_sum(l, axis=2)
+  return loss
+
 class Context3(models.BaseModel):
   def __init__(self):
     super(Context3, self).__init__()
@@ -104,7 +125,16 @@ class Context3(models.BaseModel):
 
 
   def create_model(self, model_input, vocab_size, num_frames,
-                   is_training=True, dense_labels=None, **unused_params):
+                  is_training=True, dense_labels=None, input_weights=None, **unused_params):
+    self.model_input = model_input
+    self.vocab_size = vocab_size
+    self.dense_labels = dense_labels
+    self.num_frames = num_frames
+    self.is_training = is_training
+    self.input_weights = input_weights
+    self.pretrain()
+
+  def do_job(self):
     first_layer_outputs = []
     num_splits = 15
     context_frames = SampleRandomSequence(model_input, num_frames, 50)
@@ -139,3 +169,133 @@ class Context3(models.BaseModel):
       logits = moe_layer(flatten_outputs, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
     logits = tf.clip_by_value(logits, 0., 1.)
     return {"predictions": logits}
+
+  def get_pretrain_enc_cell(self, cell_size, vocab_size):
+    cell = gru_ops.GRUBlockCell(1024)
+    if self.is_training:
+      cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
+    cell = core_rnn_cell.InputProjectionWrapper(cell, cell_size)
+    cell = core_rnn_cell.OutputProjectionWrapper(cell, cell_size)
+    return cell
+
+  def pretrain(self):
+    def do_cls(input_weights, num_frames):
+      enc_outputs_stopped = tf.stop_gradient(enc_outputs)
+      input_weights = tf.tile(
+          tf.expand_dims(input_weights, 2),
+          [1, 1, self.cell_size])
+      enc_outputs_stopped = enc_outputs_stopped * input_weights
+      enc_rep = tf.reduce_sum(enc_outputs_stopped, axis=1) / num_frames
+      # enc_rep = tf.reduce_sum(enc_outputs_stopped, axis=1) / self.max_steps
+
+      cls_func = self.moe
+      logits = cls_func(enc_rep)
+
+      if cls_func == self.moe:
+        epsilon = 1e-12
+        labels = tf.cast(self.dense_labels, tf.float32)
+        cross_entropy_loss = labels * tf.log(logits + epsilon) + (
+            1 - labels) * tf.log(1 - logits + epsilon)
+        cross_entropy_loss = tf.negative(cross_entropy_loss)
+        loss = tf.reduce_mean(tf.reduce_sum(cross_entropy_loss, 1))
+
+        predictions = logits
+      else:
+        loss = tf.nn.sigmoid_cross_entropy_with_logits(labels=tf.cast(self.dense_labels, tf.float32),
+                                                      logits=logits)
+        loss = tf.reduce_mean(tf.reduce_sum(loss, 1))
+        predictions = tf.nn.sigmoid(logits)
+      return predictions
+
+    def do_reconstruction(enc_inputs, enc_outputs, enc_last_state, input_weights, seq_lengths):
+      num_units = 100
+      attn_mech = tf.contrib.seq2seq.LuongAttention(
+          num_units=num_units,
+          memory=enc_outputs,
+          memory_sequence_length=None,
+          scale=True)
+      '''
+      attn_mech = tf.contrib.seq2seq.BahdanauAttention(
+          num_units=100,
+          memory=encoder_outputs,
+          #memory_sequence_length= T,
+          normalize=False,
+          name='attention_mechanism')
+      '''
+      cell = gru_ops.GRUBlockCell(1024)
+      cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
+      attn_cell = tf.contrib.seq2seq.AttentionWrapper(
+          cell=cell,
+          attention_mechanism=attn_mech,
+          attention_size=100,
+          attention_history=False,
+          output_attention=True,
+          name="attention_wrapper")
+
+      decoder_target = tf.reverse_sequence(
+          enc_inputs,
+          seq_lengths,)
+      decoder_inputs = tf.pad(decoder_target[:, :-1, :], [[0, 0], [1, 0], [0, 0]])
+
+      helper = tf.contrib.seq2seq.TrainingHelper(
+          inputs=decoder_inputs, # decoder inputs
+          sequence_length=seq_lengths, # decoder input length
+          name="decoder_training_helper")
+
+      # Decoder setup
+      decoder = tf.contrib.seq2seq.BasicDecoder(
+          cell=attn_cell,
+          helper=helper,
+          initial_state=enc_last_state,
+          output_layer=Dense(1024+128))
+      # Perform dynamic decoding with decoder object
+      dec_outputs, final_state = tf.contrib.seq2seq.dynamic_decode(decoder)
+      loss = reconstruct_loss(logit=dec_outputs, target=decoder_target)
+      loss = tf.reduce_sum(loss * input_weights, axis=1) / seq_lengths
+      loss = tf.reduce_mean(loss)
+      predictions = tf.no_op()
+      return predictions, loss
+
+    enc_inputs = self.model_input
+    enc_cell = self.get_pretrain_enc_cell(self.cell_size, self.cell_size)
+
+    enc_outputs, enc_state = tf.nn.dynamic_rnn(
+        enc_cell, enc_inputs, dtype=tf.float32, scope="enc")
+
+    if False:
+      predictions, loss = do_cls()
+    else:
+      predictions, loss = do_reconstruction(enc_inputs, enc_outputs,
+                                            enc_last_state=enc_state,
+                                            input_weights=self.input_weights,
+                                            seq_lengths=self.num_frames)
+    return {
+        "loss": loss,
+        "predictions": predictions,
+    }
+
+  def moe(self, enc_rep):
+    pass
+      # moe = video_level_models.MoeModel()
+      # res = moe.create_model(
+          # enc_rep, self.vocab_size,
+          # num_mixtures=10)
+      # return res["predictions"]
+
+
+  def get_variables_with_ckpt(self):
+    exclusions = "OutputFC"
+    if self.is_training:
+      variable_to_restore = []
+      for var in tf.trainable_variables():
+        excluded = False
+        for exclusion in exclusions:
+          if var.op.name.startswith(exclusion):
+            excluded = True
+            break
+        if not excluded:
+          variable_to_restore.append(var)
+          print(var.op.name)
+      return variable_to_restore
+    else:
+      return tf.all_variables()
