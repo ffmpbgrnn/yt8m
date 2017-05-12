@@ -131,10 +131,15 @@ class BaseConfig(object):
     # self.use_hdfs = False
     # self.batch_size = 512
 
-    self.model_name = "StackGRUEncoder"
+    # self.model_name = "StackGRUEncoder"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 480 # TODO
+
+    self.model_name = "ContextModel"
     self.input_feat_type = "frame"
     self.use_hdfs = False
-    self.batch_size = 512
+    self.batch_size = 128 # TODO
 
     # self.model_name = "BiHLSTMEncoder"
     # self.input_feat_type = "frame"

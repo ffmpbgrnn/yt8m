@@ -4,8 +4,7 @@ from tensorflow.contrib.rnn.python.ops import gru_ops
 from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from tensorflow.contrib.legacy_seq2seq.python.ops import seq2seq as seq2seq_lib
 from tensorflow.python.layers.core import Dense
-
-import attn
+from . import attention_wrapper
 
 slim = tf.contrib.slim
 
@@ -114,14 +113,16 @@ def reconstruct_loss(logit, target):
   loss = tf.reduce_sum(l, axis=2)
   return loss
 
-class Context3(models.BaseModel):
+
+class ContextModel(models.BaseModel):
   def __init__(self):
-    super(Context3, self).__init__()
-    self.normalize_input = True
+    super(ContextModel, self).__init__()
+    self.normalize_input = False
     self.clip_global_norm = 5
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 3e-4
+    self.decay_lr = True
 
 
   def create_model(self, model_input, vocab_size, num_frames,
@@ -132,7 +133,7 @@ class Context3(models.BaseModel):
     self.num_frames = num_frames
     self.is_training = is_training
     self.input_weights = input_weights
-    self.pretrain()
+    return self.pretrain()
 
   def do_job(self):
     first_layer_outputs = []
@@ -170,12 +171,12 @@ class Context3(models.BaseModel):
     logits = tf.clip_by_value(logits, 0., 1.)
     return {"predictions": logits}
 
-  def get_pretrain_enc_cell(self, cell_size, vocab_size):
+  def get_pretrain_enc_cell(self,):
     cell = gru_ops.GRUBlockCell(1024)
     if self.is_training:
       cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
-    cell = core_rnn_cell.InputProjectionWrapper(cell, cell_size)
-    cell = core_rnn_cell.OutputProjectionWrapper(cell, cell_size)
+    cell = core_rnn_cell.InputProjectionWrapper(cell, 1024)
+    cell = core_rnn_cell.OutputProjectionWrapper(cell, 1024)
     return cell
 
   def pretrain(self):
@@ -209,32 +210,32 @@ class Context3(models.BaseModel):
 
     def do_reconstruction(enc_inputs, enc_outputs, enc_last_state, input_weights, seq_lengths):
       num_units = 100
-      attn_mech = tf.contrib.seq2seq.LuongAttention(
+      # attn_mech = attention_wrapper.LuongAttention(
+          # num_units=num_units,
+          # memory=enc_outputs,
+          # memory_sequence_length=seq_lengths,
+          # scale=True)
+      attn_mech = tf.contrib.seq2seq.BahdanauAttention(
           num_units=num_units,
           memory=enc_outputs,
-          memory_sequence_length=None,
-          scale=True)
-      '''
-      attn_mech = tf.contrib.seq2seq.BahdanauAttention(
-          num_units=100,
-          memory=encoder_outputs,
-          #memory_sequence_length= T,
-          normalize=False,
+          memory_sequence_length=seq_lengths,
+          normalize=True,
           name='attention_mechanism')
-      '''
       cell = gru_ops.GRUBlockCell(1024)
       cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
       attn_cell = tf.contrib.seq2seq.AttentionWrapper(
           cell=cell,
           attention_mechanism=attn_mech,
-          attention_size=100,
-          attention_history=False,
-          output_attention=True,
+          attention_layer_size=1024,
+          output_attention=False,
+          initial_cell_state=enc_last_state,
           name="attention_wrapper")
 
       decoder_target = tf.reverse_sequence(
           enc_inputs,
-          seq_lengths,)
+          seq_lengths,
+          seq_dim=1,
+          batch_dim=0)
       decoder_inputs = tf.pad(decoder_target[:, :-1, :], [[0, 0], [1, 0], [0, 0]])
 
       helper = tf.contrib.seq2seq.TrainingHelper(
@@ -246,18 +247,22 @@ class Context3(models.BaseModel):
       decoder = tf.contrib.seq2seq.BasicDecoder(
           cell=attn_cell,
           helper=helper,
-          initial_state=enc_last_state,
+          initial_state=attn_cell.zero_state(tf.shape(enc_inputs)[0], dtype=tf.float32),
           output_layer=Dense(1024+128))
       # Perform dynamic decoding with decoder object
-      dec_outputs, final_state = tf.contrib.seq2seq.dynamic_decode(decoder)
-      loss = reconstruct_loss(logit=dec_outputs, target=decoder_target)
-      loss = tf.reduce_sum(loss * input_weights, axis=1) / seq_lengths
+      dec_outputs, final_state, final_sequence_lengths = tf.contrib.seq2seq.dynamic_decode(decoder, swap_memory=True,)
+      loss = reconstruct_loss(logit=dec_outputs.rnn_output, target=decoder_target)
+      # input_weights = tf.cast(input_weights, tf.float32)
+      loss = tf.reduce_sum(loss * input_weights, axis=1) / tf.cast(seq_lengths, tf.float32)
       loss = tf.reduce_mean(loss)
+      # loss = tf.contrib.seq2seq.sequence_loss(
+          # dec_outputs.rnn_output, decoder_target, input_weights,
+          # softmax_loss_function=reconstruct_loss)
       predictions = tf.no_op()
       return predictions, loss
 
     enc_inputs = self.model_input
-    enc_cell = self.get_pretrain_enc_cell(self.cell_size, self.cell_size)
+    enc_cell = self.get_pretrain_enc_cell()
 
     enc_outputs, enc_state = tf.nn.dynamic_rnn(
         enc_cell, enc_inputs, dtype=tf.float32, scope="enc")
