@@ -39,7 +39,7 @@ class BiHLSTMEncoderNew(models.BaseModel):
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 5e-4
 
-    self.cell_size = 512
+    self.cell_size = 1024
     self.max_steps = 300
     self.decay_lr = True # TODO
 
@@ -86,9 +86,9 @@ class BiHLSTMEncoderNew(models.BaseModel):
             initial_state=initial_bw_state,
             dtype=tf.float32,
             scope="enc0bw")
-        if is_training:
-          fw_state = tf.nn.dropout(fw_state, 0.8)
-          bw_state = tf.nn.dropout(bw_state, 0.8)
+        # if is_training:
+          # fw_state = tf.nn.dropout(fw_state, 0.8)
+          # bw_state = tf.nn.dropout(bw_state, 0.8)
 
         first_layer_fw_outputs[i] = fw_state
         if i == num_splits - 1:

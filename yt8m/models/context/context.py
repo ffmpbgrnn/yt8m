@@ -47,7 +47,7 @@ def SampleRandomSequence(model_input, num_frames, num_samples):
   index = tf.stack([batch_index, frame_index], 2)
   return tf.gather_nd(model_input, index)
 
-def SampleRandomSequencePad0(model_input, num_frames, num_samples):
+def SampleRandomSequencePad0(model_input, input_weights, num_frames, num_samples):
   batch_size = tf.shape(model_input)[0]
   frame_index_offset = tf.tile(
       tf.expand_dims(tf.range(num_samples), 0), [batch_size, 1])
@@ -59,11 +59,12 @@ def SampleRandomSequencePad0(model_input, num_frames, num_samples):
   frame_index = tf.minimum(start_frame_index + frame_index_offset,
                            tf.cast(num_frames, tf.int32))
   frame_index = tf.minimum(frame_index,
-                           tf.cast(num_frames, tf.int32))
+                           tf.cast(300 - 1, tf.int32))
+  num_sampled_frames = frame_index[:, -1] - frame_index[:, 0] + 1
   batch_index = tf.tile(
       tf.expand_dims(tf.range(batch_size), 1), [1, num_samples])
   index = tf.stack([batch_index, frame_index], 2)
-  return tf.gather_nd(model_input, index)
+  return tf.gather_nd(model_input, index), tf.gather_nd(input_weights, index), num_sampled_frames
 
 
 def moe_layer(model_input, hidden_size, num_mixtures,
@@ -114,6 +115,45 @@ def reconstruct_loss(logit, target):
   return loss
 
 
+def h_gru(model_input, vocab_size, is_training=True):
+  with tf.variable_scope("EncLayer0"):
+    first_enc_cell = core_rnn_cell.DeviceWrapper(
+        gru_ops.GRUBlockCell(1024),
+        device='/gpu:1')
+    runtime_batch_size = tf.shape(model_input)[0]
+    enc_init_state = tf.zeros((runtime_batch_size, 1024), dtype=tf.float32)
+    num_splits = 15
+    model_input_splits = tf.split(model_input, num_or_size_splits=num_splits, axis=1)
+    enc_state = None
+    first_layer_outputs = []
+    for i in xrange(num_splits):
+      if i == 0:
+        initial_state = enc_init_state
+      else:
+        initial_state = enc_state
+        tf.get_variable_scope().reuse_variables()
+      initial_state = tf.stop_gradient(initial_state)
+      enc_outputs, enc_state = tf.nn.dynamic_rnn(
+          first_enc_cell, model_input_splits[i], initial_state=initial_state, scope="enc0")
+      # TODO
+      enc_state = moe_layer(enc_state, 1024, 4, act_func=None, l2_penalty=1e-12)
+      if is_training:
+        enc_state = tf.nn.dropout(enc_state, 0.5)
+      first_layer_outputs.append(enc_state)
+
+  with tf.variable_scope("EncLayer1"):
+    second_enc_cell = core_rnn_cell.DeviceWrapper(
+        gru_ops.GRUBlockCell(1024),
+        device='/gpu:1')
+    first_layer_outputs = tf.stack(first_layer_outputs, axis=1)
+    enc_outputs, enc_state = tf.nn.dynamic_rnn(
+        second_enc_cell, first_layer_outputs, dtype=tf.float32, scope="enc1")
+  # TODO
+  if is_training:
+    enc_state = tf.nn.dropout(enc_state, 0.8)
+  logits = moe_layer(enc_state, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+  return logits
+
 class ContextModel(models.BaseModel):
   def __init__(self):
     super(ContextModel, self).__init__()
@@ -122,7 +162,7 @@ class ContextModel(models.BaseModel):
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 3e-4
-    self.decay_lr = True
+    # self.decay_lr = True
 
 
   def create_model(self, model_input, vocab_size, num_frames,
@@ -133,6 +173,7 @@ class ContextModel(models.BaseModel):
     self.num_frames = num_frames
     self.is_training = is_training
     self.input_weights = input_weights
+
     return self.pretrain()
 
   def do_job(self):
@@ -177,9 +218,12 @@ class ContextModel(models.BaseModel):
       cell = core_rnn_cell.DropoutWrapper(cell, 0.5, 0.5)
     cell = core_rnn_cell.InputProjectionWrapper(cell, 1024)
     cell = core_rnn_cell.OutputProjectionWrapper(cell, 1024)
+
+    cell = core_rnn_cell.DeviceWrapper(cell, device='/gpu:0')
     return cell
 
   def pretrain(self):
+
     def do_cls(input_weights, num_frames):
       enc_outputs_stopped = tf.stop_gradient(enc_outputs)
       input_weights = tf.tile(
@@ -261,23 +305,42 @@ class ContextModel(models.BaseModel):
       predictions = tf.no_op()
       return predictions, loss
 
+    do_pretrain = False
+    # TODO
+    if do_pretrain:
+      self.num_frames = tf.cast(tf.expand_dims(self.num_frames, 1), tf.float32)
+      self.model_input, self.input_weights, self.num_frames = SampleRandomSequencePad0(
+          self.model_input, self.input_weights, self.num_frames, 50)
+
     enc_inputs = self.model_input
-    enc_cell = self.get_pretrain_enc_cell()
+    with tf.device("/gpu:0"):
+      enc_cell = self.get_pretrain_enc_cell()
+      self.model_variables = tf.trainable_variables()
 
-    enc_outputs, enc_state = tf.nn.dynamic_rnn(
-        enc_cell, enc_inputs, dtype=tf.float32, scope="enc")
+      enc_outputs, enc_state = tf.nn.dynamic_rnn(
+          enc_cell, enc_inputs, dtype=tf.float32, scope="enc")
+      enc_outputs = tf.stop_gradient(enc_outputs)
 
-    if False:
-      predictions, loss = do_cls()
-    else:
+    output_dict = {}
+    if do_pretrain:
       predictions, loss = do_reconstruction(enc_inputs, enc_outputs,
                                             enc_last_state=enc_state,
                                             input_weights=self.input_weights,
                                             seq_lengths=self.num_frames)
-    return {
-        "loss": loss,
-        "predictions": predictions,
-    }
+      output_dict["predictions"] = predictions
+      output_dict["loss"] = loss
+    else:
+      with tf.device("/gpu:0"):
+        model_input = slim.conv2d(
+            tf.reshape(self.model_input, [-1, 300, 1, 1024 + 128]),
+            1024, [1, 1], activation_fn=None, scope="input_proj")
+        model_input = tf.reshape(model_input, [-1, 300, 1024])
+        inputs = enc_outputs + model_input
+        inputs = tf.nn.l2_normalize(inputs, 2)
+      with tf.device("/gpu:1"):
+        predictions = h_gru(inputs, self.vocab_size, self.is_training)
+      output_dict["predictions"] = predictions
+    return output_dict
 
   def moe(self, enc_rep):
     pass
@@ -289,10 +352,10 @@ class ContextModel(models.BaseModel):
 
 
   def get_variables_with_ckpt(self):
-    exclusions = "OutputFC"
+    exclusions = False # "OutputFC"
     if self.is_training:
       variable_to_restore = []
-      for var in tf.trainable_variables():
+      for var in self.model_variables:
         excluded = False
         for exclusion in exclusions:
           if var.op.name.startswith(exclusion):
