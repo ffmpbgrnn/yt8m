@@ -93,15 +93,15 @@ class BaseConfig(object):
     # self.input_feat_type = "frame"
     # self.use_hdfs = False
 
-    # self.model_name = "HLSTMEncoder"
-    # self.input_feat_type = "frame"
-    # self.use_hdfs = False
-    # self.batch_size = 512
-
-    self.model_name = "GRU2Skip3RandomDropout"
+    self.model_name = "HLSTMEncoder"
     self.input_feat_type = "frame"
     self.use_hdfs = False
     self.batch_size = 512
+
+    # self.model_name = "GRU2Skip3RandomDropout"
+    # self.input_feat_type = "frame"
+    # self.use_hdfs = False
+    # self.batch_size = 512
 
     # self.model_name = "FusionModel"
     # self.input_feat_type = "score"

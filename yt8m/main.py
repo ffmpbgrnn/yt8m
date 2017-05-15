@@ -198,6 +198,9 @@ class Expr(object):
         logging.info("num classes: 1000")
         dense_labels_batch = dense_labels_batch[:, :1000]
         # sparse_labels_batch = sparse_labels_batch[:, :1000]
+      if self.model.num_classes == 1001:
+        logging.info("num classes: 1001")
+        dense_labels_batch = dense_labels_batch[:, 1000: 2001]
       dense_labels_batch = tf.cast(dense_labels_batch, tf.float32)
       with tf.name_scope("model"):
         result = self.model.create_model(

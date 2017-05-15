@@ -29,16 +29,49 @@ from yt8m.starter import video_level_models
 
 slim = tf.contrib.slim
 
+def moe_layer(model_input, hidden_size, num_mixtures,
+                act_func=None, l2_penalty=None):
+  gate_activations = slim.fully_connected(
+      model_input,
+      hidden_size * (num_mixtures + 1),
+      activation_fn=None,
+      biases_initializer=None,
+      weights_regularizer=slim.l2_regularizer(l2_penalty),
+      scope="gates")
+  expert_activations = slim.fully_connected(
+      model_input,
+      hidden_size * num_mixtures,
+      activation_fn=None,
+      weights_regularizer=slim.l2_regularizer(l2_penalty),
+      scope="experts")
+
+  expert_act_func = act_func
+  gating_distribution = tf.nn.softmax(tf.reshape(
+      gate_activations,
+      [-1, num_mixtures + 1]))  # (Batch * #Labels) x (num_mixtures + 1)
+  expert_distribution = tf.reshape(
+      expert_activations,
+      [-1, num_mixtures])  # (Batch * #Labels) x num_mixtures
+  if expert_act_func is not None:
+    expert_distribution = expert_act_func(expert_distribution)
+
+  outputs = tf.reduce_sum(
+      gating_distribution[:, :num_mixtures] * expert_distribution, 1)
+  outputs = tf.reshape(outputs, [-1, hidden_size])
+  return outputs
+
 class HLSTMEncoder(models.BaseModel):
   def __init__(self):
     super(HLSTMEncoder, self).__init__()
 
     self.normalize_input = True # TODO
-    self.clip_global_norm = 5
+    self.clip_global_norm = 3
     self.var_moving_average_decay = 0.9997
     self.optimizer_name = "AdamOptimizer"
     self.base_learning_rate = 5e-4
 
+    # TODO
+    self.num_classes = 1001
     self.cell_size = 1024
     self.max_steps = 300
 
@@ -50,9 +83,8 @@ class HLSTMEncoder(models.BaseModel):
     # dec_cell = self.get_dec_cell(self.cell_size)
     runtime_batch_size = tf.shape(model_input)[0]
 
-    moe = video_level_models.MoeModel()
     with tf.variable_scope("EncLayer0"):
-      first_enc_cell = self.get_enc_cell(self.cell_size, vocab_size) # TODO
+      first_enc_cell = self.get_enc_cell(self.cell_size,) # TODO
       enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
       num_splits = 15
       model_input_splits = tf.split(model_input, num_or_size_splits=num_splits, axis=1)
@@ -68,13 +100,13 @@ class HLSTMEncoder(models.BaseModel):
         enc_outputs, enc_state = tf.nn.dynamic_rnn(
             first_enc_cell, model_input_splits[i], initial_state=initial_state, scope="enc0")
         # TODO
-        enc_state = moe.moe_layer(enc_state, 1024, 2, act_func=None, l2_penalty=1e-12)
+        enc_state = moe_layer(enc_state, 1024, 4, act_func=None, l2_penalty=1e-12)
         if is_training:
-          enc_state = tf.nn.dropout(enc_state, 0.8)
+          enc_state = tf.nn.dropout(enc_state, 0.5)
         first_layer_outputs.append(enc_state)
 
     with tf.variable_scope("EncLayer1"):
-      second_enc_cell = self.get_enc_cell(self.cell_size, vocab_size)
+      second_enc_cell = self.get_enc_cell(self.cell_size,)
       enc_init_state = tf.zeros((runtime_batch_size, self.cell_size), dtype=tf.float32)
       first_layer_outputs = tf.stack(first_layer_outputs, axis=1)
       enc_outputs, enc_state = tf.nn.dynamic_rnn(
@@ -82,7 +114,8 @@ class HLSTMEncoder(models.BaseModel):
     # TODO
     if is_training:
       enc_state = tf.nn.dropout(enc_state, 0.8)
-    logits = moe.moe_layer(enc_state, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
+    tf.logging.info(vocab_size)
+    logits = moe_layer(enc_state, vocab_size, 4, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
     return {"predictions": logits}
     '''
     logits = slim.fully_connected(
@@ -95,7 +128,7 @@ class HLSTMEncoder(models.BaseModel):
     return {"predictions": logits, 'loss': loss}
     '''
 
-  def get_enc_cell(self, cell_size, vocab_size):
+  def get_enc_cell(self, cell_size,):
     # cell = cudnn_rnn_ops.CudnnGRU(1, cell_size, (1024+128))
     cell = gru_ops.GRUBlockCell(cell_size)
     return cell
