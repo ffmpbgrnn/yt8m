@@ -61,14 +61,15 @@ def evaluation_loop(self, saver, model_ckpt_path):
   video_ids = []
   output_scores = 0 # 1->output score, 2-> output features
   if output_scores == 1:
-    model_id = model_ckpt_path.split("/")[-2]
+    model_id = model_ckpt_path.split("/")[-2] + "-" + model_ckpt_path.split("-")[-1]
     # num_insts = 4906660
     # stage = "train"
     # num_insts = 1401828
     # stage = "validate"
     num_insts = 700640
     stage = "test"
-    video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
+    # video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
+    video_ids_pkl_path = pkl.load(open("/data/D2DCRC/linchao/YT/{}_vids_dict.pkl".format(stage)))
     pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.{}.h5".format(model_id, stage), "w")
     pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, self.model.num_classes),
                                             dtype=np.float32)
@@ -105,8 +106,10 @@ def evaluation_loop(self, saver, model_ckpt_path):
         predictions = res["predictions"]
         video_id = res["video_id"].tolist()
         if output_scores == 1:
-          pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
-          video_ids += video_id
+          for i in xrange(len(video_id)):
+            pred_dataset[video_ids_pkl_path[video_id[i]], :] = predictions[i]
+          # pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
+          # video_ids += video_id
         elif output_scores == 2:
           for i in xrange(len(video_id)):
             sparse_label = np.array(res["dense_labels"][i], dtype=np.int32)
@@ -154,22 +157,22 @@ def evaluation_loop(self, saver, model_ckpt_path):
           "metrics.")
       if output_scores == 1:
         pred_out.close()
-        pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
+        # pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
       elif output_scores == 2:
         tfrecord_writer.close()
-      # calculate the metrics for the entire epoch
-      epoch_info_dict = evl_metrics.get()
-      epoch_info_dict["epoch_id"] = global_step_val
-
-      if summary_writer:
-        summary_writer.add_summary(res["summary"], global_step_val)
-      epochinfo = utils.AddEpochSummary(
-          summary_writer,
-          global_step_val,
-          epoch_info_dict,
-          summary_scope="Eval")
-      logging.info(epochinfo)
-      evl_metrics.clear()
+      else:
+        # calculate the metrics for the entire epoch
+        epoch_info_dict = evl_metrics.get()
+        epoch_info_dict["epoch_id"] = global_step_val
+        if summary_writer:
+          summary_writer.add_summary(res["summary"], global_step_val)
+        epochinfo = utils.AddEpochSummary(
+            summary_writer,
+            global_step_val,
+            epoch_info_dict,
+            summary_scope="Eval")
+        logging.info(epochinfo)
+        evl_metrics.clear()
     except Exception as e:  # pylint: disable=broad-except
       logging.info("Unexpected exception: " + str(e))
       coord.request_stop(e)

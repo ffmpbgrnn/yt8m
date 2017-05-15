@@ -18,6 +18,7 @@ from yt8m.models.lstm import bi_h_lstm
 from yt8m.models.lstm import bi_h_lstm_new
 from yt8m.models.lstm import h_lstm
 from yt8m.models.lstm import stack_gru
+from yt8m.models.skip import gru_2_skip_3_random_dropout
 from yt8m.models.context import context
 from yt8m.models.fusion import fusion
 from yt8m.models.label_bias import binary_cls
@@ -67,7 +68,8 @@ class Expr(object):
         [frame_level_models, video_level_models, lstm, lstm_enc_dec, skip_thought,
          lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls,
          h_lstm, fusion, h3gru, gru_attn_new, ln_h_lstm, bi_h_lstm, bi_h_lstm_new,
-         dilation_model, convGRU, randomseq, stack_gru, context])()
+         dilation_model, convGRU, randomseq, stack_gru, context,
+         gru_2_skip_3_random_dropout])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(
@@ -191,7 +193,11 @@ class Expr(object):
         model_input = tf.nn.l2_normalize(model_input_raw, feature_dim)
       else:
         model_input = model_input_raw
-
+      # TODO
+      if self.model.num_classes == 1000:
+        logging.info("num classes: 1000")
+        dense_labels_batch = dense_labels_batch[:, :1000]
+        # sparse_labels_batch = sparse_labels_batch[:, :1000]
       dense_labels_batch = tf.cast(dense_labels_batch, tf.float32)
       with tf.name_scope("model"):
         result = self.model.create_model(

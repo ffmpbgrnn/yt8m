@@ -325,7 +325,7 @@ class YT8MFrameFeatureReader(BaseReader):
     # read ground truth labels
     sparse_labels = contexts["labels"].values
     dense_labels = (tf.cast(
-        tf.sparse_to_dense(sparse_labels, (self.num_classes,), 1,
+        tf.sparse_to_dense(sparse_labels, (4716,), 1,
             validate_indices=False),
         tf.bool))
     if self.num_max_labels == 1:
