@@ -15,6 +15,7 @@ esac
 
 gpu_id=`python gpustat.py $hostname $stage`
 export CUDA_VISIBLE_DEVICES=$gpu_id;
+export CUDA_VISIBLE_DEVICES=1;
 echo "Using GPU $CUDA_VISIBLE_DEVICES"
 
 #source /home/linchao/tf/whl/04.07.2017_py2/bin/activate;
