@@ -72,6 +72,15 @@ class ClockworkEncoder(models.BaseModel):
 
     if is_training:
       enc_state = tf.nn.dropout(enc_state, 0.8)
+    enc_state = slim.fully_connected(
+      enc_state,
+      1024,
+      activation_fn=None,
+      biases_initializer=None,
+      weights_regularizer=slim.l2_regularizer(1e-8),
+      scope="outputLayers")
+    if is_training:
+      enc_state = tf.nn.dropout(enc_state, 0.8)
     logits = moe_layer(enc_state, vocab_size, 2, act_func=tf.nn.sigmoid, l2_penalty=1e-8)
     return {"predictions": logits}
 

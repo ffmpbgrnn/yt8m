@@ -18,6 +18,7 @@ from yt8m.models.lstm import bi_h_lstm
 from yt8m.models.lstm import bi_h_lstm_new
 from yt8m.models.lstm import h_lstm
 from yt8m.models.lstm import stack_gru
+from yt8m.models.attn import attn_models
 from yt8m.models.clockwork import clockwork
 from yt8m.models.skip import gru_2_skip_3_random_dropout
 from yt8m.models.context import context
@@ -70,7 +71,7 @@ class Expr(object):
          lstm_memnet, conv_train, binary_cls, dilation, netvlad, noisy_label, prune_cls,
          h_lstm, fusion, h3gru, gru_attn_new, ln_h_lstm, bi_h_lstm, bi_h_lstm_new,
          dilation_model, convGRU, randomseq, stack_gru, context,
-         gru_2_skip_3_random_dropout, clockwork])()
+         gru_2_skip_3_random_dropout, clockwork, attn_models])()
     self.label_loss_fn = utils.find_class_by_name(
         self.config.label_loss, [losses])()
     self.optimizer = utils.find_class_by_name(

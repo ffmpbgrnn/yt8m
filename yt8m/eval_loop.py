@@ -70,6 +70,7 @@ def evaluation_loop(self, saver, model_ckpt_path):
     stage = "test"
     # video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
     video_ids_pkl_path = pkl.load(open("/data/D2DCRC/linchao/YT/{}_vids_dict.pkl".format(stage)))
+    log_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.touch".format(model_id, stage)
     pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.{}.h5".format(model_id, stage), "w")
     pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, self.model.num_classes),
                                             dtype=np.float32)
@@ -157,6 +158,8 @@ def evaluation_loop(self, saver, model_ckpt_path):
           "metrics.")
       if output_scores == 1:
         pred_out.close()
+        with open(log_path) as fout:
+          print>>fout , "Done"
         # pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
       elif output_scores == 2:
         tfrecord_writer.close()
