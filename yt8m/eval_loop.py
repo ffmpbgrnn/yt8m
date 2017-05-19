@@ -59,18 +59,18 @@ def evaluation_loop(self, saver, model_ckpt_path):
   sess_config = tf.ConfigProto()
   sess_config.gpu_options.per_process_gpu_memory_fraction = 0.9
   video_ids = []
-  output_scores = 0 # 1->output score, 2-> output features
+  output_scores = 1 # 1->output score, 2-> output features
   if output_scores == 1:
     model_id = model_ckpt_path.split("/")[-2] + "-" + model_ckpt_path.split("-")[-1]
     # num_insts = 4906660
     # stage = "train"
-    # num_insts = 1401828
-    # stage = "validate"
-    num_insts = 700640
-    stage = "test"
-    # video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
-    video_ids_pkl_path = pkl.load(open("/data/D2DCRC/linchao/YT/{}_vids_dict.pkl".format(stage)))
-    log_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.touch".format(model_id, stage)
+    num_insts = 1401828
+    stage = "validate"
+    # num_insts = 700640
+    # stage = "test"
+    video_ids_pkl_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.pkl".format(model_id, stage)
+    # video_ids_pkl_path = pkl.load(open("/data/D2DCRC/linchao/YT/{}_vids_dict.pkl".format(stage)))
+    # log_path = "/data/D2DCRC/linchao/YT/scores/{}.{}.touch".format(model_id, stage)
     pred_out = h5py.File("/data/D2DCRC/linchao/YT/scores/{}.{}.h5".format(model_id, stage), "w")
     pred_dataset = pred_out.create_dataset('scores', shape=(num_insts, self.model.num_classes),
                                             dtype=np.float32)
@@ -107,10 +107,10 @@ def evaluation_loop(self, saver, model_ckpt_path):
         predictions = res["predictions"]
         video_id = res["video_id"].tolist()
         if output_scores == 1:
-          for i in xrange(len(video_id)):
-            pred_dataset[video_ids_pkl_path[video_id[i]], :] = predictions[i]
-          # pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
-          # video_ids += video_id
+          # for i in xrange(len(video_id)):
+            # pred_dataset[video_ids_pkl_path[video_id[i]], :] = predictions[i]
+          pred_dataset[len(video_ids): len(video_ids) + len(video_id), :] = predictions
+          video_ids += video_id
         elif output_scores == 2:
           for i in xrange(len(video_id)):
             sparse_label = np.array(res["dense_labels"][i], dtype=np.int32)
@@ -158,9 +158,9 @@ def evaluation_loop(self, saver, model_ckpt_path):
           "metrics.")
       if output_scores == 1:
         pred_out.close()
-        with open(log_path) as fout:
-          print>>fout , "Done"
-        # pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
+        # with open(log_path, 'w') as fout:
+          # print>>fout , "Done"
+        pkl.dump(video_ids, open(video_ids_pkl_path, "w"))
       elif output_scores == 2:
         tfrecord_writer.close()
       else:
